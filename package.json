@@ -1,0 +1,21 @@
+{
+  "name": "trading-sdk",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "build": "tsc",
+    "sdkTest": "ts-node tests/sdkTest.ts",
+    "sdkTest:watch": "nodemon --watch src --watch tests --exec 'npm run sdkTest'"
+  },
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "nodemon": "^3.1.4",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.6.2"
+  },
+  "dependencies": {
+    "ethers": "^6.13.2"
+  }
+}
