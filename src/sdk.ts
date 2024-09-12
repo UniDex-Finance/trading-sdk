@@ -4,8 +4,7 @@ import { CONTRACT_ADDRESSES } from "./config/constants";
 import diamondAbi from "./abi/GNSDiamond.json";
 import { getRequiredFunction } from "./utils/diamondHelper";
 import { multiCall } from "./utils/multicallHelper";
-import { pairs } from '@gainsnetwork/sdk';
-
+import { Pair, pairs } from "@gainsnetwork/sdk";
 
 export class SDK {
   private diamondContract: ethers.Contract;
@@ -26,7 +25,7 @@ export class SDK {
     return await this.diamondContract[getTradesFn.name](userAddress);
   }
 
-  public async getMarkets(): Promise<any[]> {
+  public async getMarkets(): Promise<string[]> {
     const pairCount = 15;
 
     const calls = Array.from({ length: pairCount }, (_, index) => ({
@@ -34,14 +33,16 @@ export class SDK {
       args: [index],
     }));
 
-    const pairsResponse = (await multiCall(this.diamondContract, calls)).map(({ from, to, spreadP, groupIndex, feeIndex }) => ({
-      from,
-      to,
-      spreadP,
-      groupIndex,
-      feeIndex,
-    }));
+    const pairsResponse = (await multiCall(this.diamondContract, calls)).map(
+      ({ from, to, spreadP, groupIndex, feeIndex }) => ({
+        from,
+        to,
+        spreadP,
+        groupIndex,
+        feeIndex,
+      })
+    ) as Pair[];
 
-    return pairsResponse.map(it => `${it.from}/${it.to}`);
+    return pairsResponse.map((pair: Pair) => `${pair.from}/${pair.to}`);
   }
 }
