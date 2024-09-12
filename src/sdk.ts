@@ -1,16 +1,16 @@
 import { ethers } from "ethers";
 import { provider } from "./utils/provider";
-import { CONTRACT_ADDRESSES } from "./config/constants";
-import diamondAbi from "./abi/GNSDiamond.json";
+import { DIAMOND_ADDRESS } from "./config/constants";
 import { getRequiredFunction } from "./utils/diamondHelper";
 import { multiCall } from "./utils/multicallHelper";
 import { Pair, pairs } from "@gainsnetwork/sdk";
+import diamondAbi from "./abi/GNSDiamond.json";
 
 export class SDK {
   private diamondContract: ethers.Contract;
 
   constructor() {
-    this.diamondContract = new ethers.Contract(CONTRACT_ADDRESSES.GNS_DIAMOND, diamondAbi, provider);
+    this.diamondContract = new ethers.Contract(DIAMOND_ADDRESS, diamondAbi, provider);
   }
 
   public async getAllTrades(offset: number, limit: number): Promise<any> {
@@ -25,24 +25,19 @@ export class SDK {
     return await this.diamondContract[getTradesFn.name](userAddress);
   }
 
-  public async getMarkets(): Promise<string[]> {
-    const pairCount = 15;
+  public async getMarkets(): Promise<any[]> {
+    const pairCount = true ? 20 : Object.keys(pairs).length;
 
     const calls = Array.from({ length: pairCount }, (_, index) => ({
       functionName: "pairs",
       args: [index],
     }));
 
-    const pairsResponse = (await multiCall(this.diamondContract, calls)).map(
-      ({ from, to, spreadP, groupIndex, feeIndex }) => ({
-        from,
-        to,
-        spreadP,
-        groupIndex,
-        feeIndex,
-      })
-    ) as Pair[];
+    const results: Pair[] = await multiCall(this.diamondContract, calls);
 
-    return pairsResponse.map((pair: Pair) => `${pair.from}/${pair.to}`);
+    return results.map((result) => {
+      const { from, to } = result;
+      return `${from}/${to}`;
+    });
   }
 }
