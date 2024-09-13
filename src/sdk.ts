@@ -3,21 +3,30 @@ import { GNS_DIAMOND_ADDRESSES, MULTICALL3_ADDRESS, SupportedChainId } from "./c
 import { multiCall } from "./utils/multicallHelper";
 import { pairs } from "@gainsnetwork/sdk";
 import { GNSDiamond, GNSDiamond__factory, Multicall3__factory } from "./types/contracts";
-import { Contract, ethers } from "ethers";
-import { Market, Pair } from "./types";
+import { Contract, ContractTransactionResponse, ethers, parseUnits } from "ethers";
+import {
+  Market,
+  Pair,
+  ModifyPositionDirection,
+  ModifyPositionParams,
+  SubmitConditionalOrderParams,
+  CancelConditionalOrderParams,
+} from "./types";
 
 export class SDK {
   private chainId: SupportedChainId;
+  private signer?: ethers.Signer;
   private gnsDiamond: GNSDiamond;
   private multicall3: Contract;
 
-  constructor(chainId: SupportedChainId) {
+  constructor(chainId: SupportedChainId, signer?: ethers.Signer) {
     this.chainId = chainId;
+    this.signer = signer;
 
-    const provider = getProvider(chainId);
+    const runner = this.signer ?? getProvider(chainId);
 
-    this.gnsDiamond = GNSDiamond__factory.connect(GNS_DIAMOND_ADDRESSES[chainId], provider);
-    this.multicall3 = new ethers.Contract(MULTICALL3_ADDRESS, Multicall3__factory.abi, provider);
+    this.gnsDiamond = GNSDiamond__factory.connect(GNS_DIAMOND_ADDRESSES[chainId], runner);
+    this.multicall3 = new ethers.Contract(MULTICALL3_ADDRESS, Multicall3__factory.abi, runner);
   }
 
   public async getAllTrades(offset: number, limit: number): Promise<any> {
@@ -148,4 +157,126 @@ export class SDK {
     });
     return markets;
   }
+
+  // Write functions
+  public async createAccount() {}
+
+  public async modifyPosition({
+    index,
+    collateralDelta,
+    leverageDelta,
+    direction,
+    slippageP,
+    expectedPrice,
+  }: ModifyPositionParams) {
+    if (!this.signer) {
+      return null;
+    }
+
+    const _leveragedDelta = Math.floor(leverageDelta * 1e3);
+    const _slippageP = BigInt(Math.floor(slippageP * 1e3));
+    const _expectedPrice = BigInt(Math.floor(expectedPrice * 1e10));
+
+    let tx: ContractTransactionResponse | null = null;
+
+    if (direction === ModifyPositionDirection.INCREASE) {
+      tx = await this.gnsDiamond.increasePositionSize(
+        index,
+        collateralDelta,
+        _leveragedDelta,
+        _expectedPrice,
+        _slippageP
+      );
+    } else if (direction === ModifyPositionDirection.DECREASE) {
+      const trader = await this.signer.getAddress();
+      const tradeInfo = await this.gnsDiamond.getTradeInfo(trader, index);
+
+      if (tradeInfo.maxSlippageP === _slippageP) {
+        tx = await this.gnsDiamond.decreasePositionSize(index, collateralDelta, _leveragedDelta, _expectedPrice);
+      } else {
+        tx = await this.gnsDiamond.multicall([
+          this.gnsDiamond.interface.encodeFunctionData("updateMaxClosingSlippageP", [index, _slippageP]),
+          this.gnsDiamond.interface.encodeFunctionData("decreasePositionSize", [
+            index,
+            collateralDelta,
+            _leveragedDelta,
+            _expectedPrice,
+          ]),
+        ]);
+      }
+    }
+
+    return tx;
+  }
+
+  public async submitConditionalOrder({
+    user,
+    pairIndex,
+    collateralAmount,
+    openPrice,
+    long,
+    leverage,
+    tp,
+    sl,
+    collateralIndex,
+    tradeType,
+    maxSlippage,
+    ref,
+  }: SubmitConditionalOrderParams) {
+    if (!this.signer) {
+      return null;
+    }
+
+    const tradeData = {
+      user,
+      pairIndex,
+      index: 0,
+      collateralAmount,
+      openPrice: openPrice.toString(),
+      long,
+      leverage: Math.floor(leverage * 1e3),
+      tp: Math.floor(tp).toString(),
+      sl: Math.floor(sl).toString(),
+      isOpen: true,
+      collateralIndex,
+      tradeType,
+      __placeholder: "0",
+    };
+
+    const tx = await this.gnsDiamond.openTrade(
+      tradeData,
+      Math.floor(maxSlippage * 1e3).toString(),
+      ref ?? "0x0000000000000000000000000000000000000000"
+    );
+
+    return tx;
+  }
+
+  public async cancelConditionalOrder({ index, slippageP, expectedPrice }: CancelConditionalOrderParams) {
+    if (!this.signer) {
+      return null;
+    }
+
+    const _expectedPrice = BigInt(Math.floor(expectedPrice * 1e10));
+    const _slippageP = slippageP !== undefined ? BigInt(Math.floor(slippageP * 1e3)) : undefined;
+
+    if (_slippageP !== undefined) {
+      const trader = await this.signer.getAddress();
+      const tradeInfo = await this.gnsDiamond.getTradeInfo(trader, index);
+      if (tradeInfo.maxSlippageP !== _slippageP) {
+        return await this.gnsDiamond.multicall([
+          this.gnsDiamond.interface.encodeFunctionData("updateMaxClosingSlippageP", [index, _slippageP]),
+          this.gnsDiamond.interface.encodeFunctionData("closeTradeMarket", [index, _expectedPrice]),
+        ]);
+      }
+    }
+
+    return await this.gnsDiamond.closeTradeMarket(index, _expectedPrice);
+  }
+
+  public async modifyAccountMargin() {}
+
+  public async addDelegate() {}
+
+  public async removeDelegate() {}
 }
