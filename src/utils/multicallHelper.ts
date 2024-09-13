@@ -19,7 +19,7 @@ export const multiCall = async (
         throw new Error(`Call failed for function ${calls[index].functionName} at index ${index}`);
       }
 
-      return targetContract.interface.decodeFunctionResult(calls[index].functionName, returnData)[0];
+      return targetContract.interface.decodeFunctionResult(calls[index].functionName, returnData);
     });
   } catch (error) {
     console.error("Multicall failed", error);
