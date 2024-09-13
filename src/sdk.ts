@@ -1,28 +1,34 @@
-import { ethers } from "ethers";
-import { provider } from "./utils/provider";
-import { DIAMOND_ADDRESS } from "./config/constants";
-import { getRequiredFunction } from "./utils/diamondHelper";
+import { getProvider } from "./utils/provider";
+import { GNS_DIAMOND_ADDRESSES, MULTICALL3_ADDRESS, SupportedChainId } from "./config/constants";
 import { multiCall } from "./utils/multicallHelper";
 import { Pair, pairs } from "@gainsnetwork/sdk";
-import diamondAbi from "./abi/GNSDiamond.json";
+import { GNSDiamond, GNSDiamond__factory, Multicall3__factory } from "./types/contracts";
+import { Contract, ethers } from "ethers";
 
 export class SDK {
-  private diamondContract: ethers.Contract;
+  private chainId: SupportedChainId;
+  private gnsDiamond: GNSDiamond;
+  private multicall3: Contract;
 
-  constructor() {
-    this.diamondContract = new ethers.Contract(DIAMOND_ADDRESS, diamondAbi, provider);
+  constructor(chainId: SupportedChainId) {
+    this.chainId = chainId;
+
+    const provider = getProvider(chainId);
+
+    this.gnsDiamond = GNSDiamond__factory.connect(GNS_DIAMOND_ADDRESSES[chainId], provider);
+    this.multicall3 = new ethers.Contract(MULTICALL3_ADDRESS, Multicall3__factory.abi, provider);
   }
 
   public async getAllTrades(offset: number, limit: number): Promise<any> {
-    const getAllTradesFn = getRequiredFunction(this.diamondContract, "getAllTrades");
+    const allTrades = await this.gnsDiamond.getAllTrades(offset, limit);
 
-    return await this.diamondContract[getAllTradesFn.name](offset, limit);
+    return allTrades;
   }
 
   public async getUserTrades(userAddress: string): Promise<any> {
-    const getTradesFn = getRequiredFunction(this.diamondContract, "getTrades");
+    const userTrades = await this.gnsDiamond.getTrades(userAddress);
 
-    return await this.diamondContract[getTradesFn.name](userAddress);
+    return userTrades;
   }
 
   public async getMarkets(): Promise<any[]> {
@@ -33,7 +39,7 @@ export class SDK {
       args: [index],
     }));
 
-    const results: Pair[] = await multiCall(this.diamondContract, calls);
+    const results: Pair[] = await multiCall(this.multicall3, this.gnsDiamond, calls);
 
     return results.map((result) => {
       const { from, to } = result;

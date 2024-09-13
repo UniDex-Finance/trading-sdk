@@ -9,5 +9,10 @@ export interface Market {
   spreadP: number;
   feeIndex: number; // => feeRates
   maxLeverage: number;
-  isActive: boolean // => isSuspended
+  isActive: boolean; // => isSuspended
+}
+
+export enum ModifyPositionDirection {
+  INCREASE,
+  DECREASE,
 }
