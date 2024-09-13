@@ -142,8 +142,8 @@ export class SDK {
         }),
         spreadP: pair.spreadP,
         feeIndex: pair.feeIndex,
-        maxLeverage: 150n,
-        isActive: true,
+        maxLeverage: 150n, // @todo
+        isActive: true, // @todo
       };
     });
     return markets;
