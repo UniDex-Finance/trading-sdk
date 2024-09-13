@@ -1,3 +1,3 @@
 1) `npm install`
-
-2) edit `runSdkTest` with input data and run `npm run sdkTest`
+2) `npm run dev`
+3) edit `runSdkTest` with input data
