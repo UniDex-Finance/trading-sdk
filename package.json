@@ -5,9 +5,10 @@
   "main": "index.js",
   "scripts": {
     "build": "tsc",
+    "postinstall": "npm run generate-types",
     "generate-types": "typechain --target=ethers-v6 'src/abi/*.json' --out-dir src/types/contracts",
     "sdkTest": "ts-node tests/sdkTest.ts",
-    "sdkTest:watch": "nodemon --watch src --watch tests --exec 'npm run sdkTest'",
+    "dev": "nodemon --watch 'src/**' --watch 'tests/**' --ext 'ts,json' --exec 'ts-node tests/sdkTest.ts'",
     "typecheck": "pnpm generate-types && tsc --noEmit"
   },
   "author": "",
