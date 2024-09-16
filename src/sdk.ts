@@ -3,7 +3,7 @@ import { GNS_DIAMOND_ADDRESSES, MULTICALL3_ADDRESS, SupportedChainId } from "./c
 import { multiCall } from "./utils/multicallHelper";
 import { pairs } from "@gainsnetwork/sdk";
 import { GNSDiamond, GNSDiamond__factory, Multicall3__factory } from "./types/contracts";
-import { Contract, ContractTransactionResponse, ethers, parseUnits } from "ethers";
+import { Contract, ContractTransactionResponse, ethers, keccak256 } from "ethers";
 import {
   Market,
   Pair,
@@ -12,7 +12,9 @@ import {
   SubmitConditionalOrderParams,
   CancelConditionalOrderParams,
   Position,
+  PendingTransactionDetails,
 } from "./types";
+import { ShadowWallet } from "./libs/ShadowWallet";
 
 export class SDK {
   private chainId: SupportedChainId;
@@ -234,7 +236,8 @@ export class SDK {
         closingFee: 0n, // @todo
         liquidationPrice: 0n, // @todo
         leverage: trade.leverage,
-        pnl: { // @todo
+        pnl: {
+          // @todo
           netPnl: 0n,
           netPnlP: 0n,
           uPnL: 0n,
@@ -367,7 +370,35 @@ export class SDK {
 
   public async modifyAccountMargin() {}
 
-  public async addDelegate() {}
+  public async getShadowWallet(
+    pin: string,
+    getPendingTransactionDetails: (chainId, address) => PendingTransactionDetails
+  ) {
+    if (!this.signer) {
+      return null;
+    }
 
-  public async removeDelegate() {}
+    const msg = `Your One-Click Trading PIN: ${pin}`;
+    const signedMsg = await this.signer.signMessage(msg);
+    const shadowKey = keccak256(signedMsg);
+    const provider = this.signer.provider as any;
+
+    return new ShadowWallet(shadowKey, provider, this.chainId, getPendingTransactionDetails);
+  }
+
+  public async addDelegate(shadowWallet: ShadowWallet) {
+    if (!this.signer) {
+      return null;
+    }
+
+    return await this.gnsDiamond.setTradingDelegate(shadowWallet.address);
+  }
+
+  public async removeDelegate() {
+    if (!this.signer) {
+      return null;
+    }
+
+    return await this.gnsDiamond.removeTradingDelegate();
+  }
 }

@@ -15,21 +15,21 @@ export interface Market {
 
 export interface Position {
   index: number; // => marketKey
-  long: boolean, // => side
+  long: boolean; // => side
   openPrice: bigint; // => avgEntryPrice
   positionSize: bigint; // => notionalValue
   positionSizeInToken: bigint; // => size
   borrowingFee: bigint; // => owedInterest
   closingFee: bigint; // => borrowingFee + closingFee => totalFees
-  liquidationPrice: bigint; 
+  liquidationPrice: bigint;
   leverage: bigint;
   pnl: {
     netPnl: bigint; // => realizedPnl.netPnl
     netPnlP: bigint; // => realizedPnl.netPnlPct
     uPnL: bigint; // => unrealizedPnl.pnl
     uPnLP: bigint; // => unrealizedPnl.netPnlPct
-  },
-  maxLeverage: bigint
+  };
+  maxLeverage: bigint;
 }
 
 export enum PositionSide {
@@ -81,4 +81,9 @@ export type CancelConditionalOrderParams = {
   index: number;
   expectedPrice: number;
   slippageP?: number;
+};
+
+export type PendingTransactionDetails = {
+  count: number;
+  latestNonce: number;
 };
