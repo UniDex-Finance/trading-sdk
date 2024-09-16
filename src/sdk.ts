@@ -11,6 +11,7 @@ import {
   ModifyPositionParams,
   SubmitConditionalOrderParams,
   CancelConditionalOrderParams,
+  Position,
 } from "./types";
 
 export class SDK {
@@ -185,12 +186,67 @@ export class SDK {
     return markets;
   }
 
-  public async getPositions(account: string): Promise<any> {
+  public async getPositions(account: string): Promise<Position[]> {
+    const [trades, tradeInfos] = await Promise.all([
+      this.gnsDiamond.getTrades(account),
+      this.gnsDiamond.getTradeInfos(account),
+    ]);
 
+    const userTrades = trades.map((trade, index) => {
+      const tradeInfo = tradeInfos[index];
+      return {
+        trade: {
+          user: trade.user,
+          index: trade.index,
+          pairIndex: trade.pairIndex,
+          leverage: trade.leverage,
+          long: trade.long,
+          isOpen: trade.isOpen,
+          collateralIndex: trade.collateralIndex,
+          tradeType: trade.tradeType,
+          collateralAmount: trade.collateralAmount,
+          openPrice: trade.openPrice,
+          tp: trade.tp,
+          sl: trade.sl,
+        },
+        tradeInfo: {
+          createdBlock: tradeInfo.createdBlock,
+          tpLastUpdatedBlock: tradeInfo.tpLastUpdatedBlock,
+          slLastUpdatedBlock: tradeInfo.slLastUpdatedBlock,
+          maxSlippageP: tradeInfo.maxSlippageP,
+          lastOiUpdateTs: tradeInfo.lastOiUpdateTs,
+          collateralPriceUsd: tradeInfo.collateralPriceUsd,
+          contractsVersion: tradeInfo.contractsVersion,
+          lastPosIncreaseBlock: tradeInfo.lastPosIncreaseBlock,
+        },
+      };
+    });
+
+    return userTrades.map((tradeContainer) => {
+      const { trade, tradeInfo } = tradeContainer;
+      return {
+        index: Number(trade.pairIndex),
+        long: trade.long,
+        openPrice: trade.openPrice,
+        positionSize: trade.collateralAmount * trade.leverage,
+        positionSizeInToken: 0n, // @todo
+        borrowingFee: 0n, // @todo
+        closingFee: 0n, // @todo
+        liquidationPrice: 0n, // @todo
+        leverage: trade.leverage,
+        pnl: { // @todo
+          netPnl: 0n,
+          netPnlP: 0n,
+          uPnL: 0n,
+          uPnLP: 0n,
+        },
+        maxLeverage: 0n, // @todo
+      };
+    });
   }
 
-  public async getPositionsHistory(account: string): Promise<any> {
-    
+  public async getPositionsHistory(account: string): Promise<Position[]> {
+    return [];
   }
 
   // Write functions

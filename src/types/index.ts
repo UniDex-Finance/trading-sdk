@@ -1,6 +1,6 @@
 export interface Market {
   from: string; // => marketName
-  to: string; /// => marketName
+  to: string; // => marketName
   groupIndex: bigint; // => category
   index: number; // => marketKey
   pairBorrowingFees: any;
@@ -11,6 +11,30 @@ export interface Market {
   minLeverage: bigint;
   maxLeverage: bigint;
   isActive: boolean; // => isSuspended
+}
+
+export interface Position {
+  index: number; // => marketKey
+  long: boolean, // => side
+  openPrice: bigint; // => avgEntryPrice
+  positionSize: bigint; // => notionalValue
+  positionSizeInToken: bigint; // => size
+  borrowingFee: bigint; // => owedInterest
+  closingFee: bigint; // => borrowingFee + closingFee => totalFees
+  liquidationPrice: bigint; 
+  leverage: bigint;
+  pnl: {
+    netPnl: bigint; // => realizedPnl.netPnl
+    netPnlP: bigint; // => realizedPnl.netPnlPct
+    uPnL: bigint; // => unrealizedPnl.pnl
+    uPnLP: bigint; // => unrealizedPnl.netPnlPct
+  },
+  maxLeverage: bigint
+}
+
+export enum PositionSide {
+  LONG,
+  SHORT,
 }
 
 export type Pair = {
