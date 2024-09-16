@@ -8,6 +8,7 @@ export interface Market {
   openInterests: any;
   spreadP: bigint;
   feeIndex: bigint; // => feeRates
+  minLeverage: bigint;
   maxLeverage: bigint;
   isActive: boolean; // => isSuspended
 }

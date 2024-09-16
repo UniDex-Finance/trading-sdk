@@ -42,7 +42,11 @@ export class SDK {
   }
 
   public async getMarkets(): Promise<any> {
-    const collaterals = await this.gnsDiamond.getCollaterals();
+    const [collaterals, maxPairLeverages, groupCount] = await Promise.all([
+      this.gnsDiamond.getCollaterals(),
+      this.gnsDiamond.getAllPairsRestrictedMaxLeverage(),
+      this.gnsDiamond.groupsCount(),
+    ]);
 
     const pairCount = true ? 5 : Object.keys(pairs).length; // @kuko todo: remove 5 to get all markets
 
@@ -52,6 +56,22 @@ export class SDK {
     }));
 
     const pairResults: [Pair][] = await multiCall(this.multicall3, this.gnsDiamond, pairCalls);
+
+    const groupCalls = Array.from({ length: Number(groupCount) }, (_, index) => ({
+      functionName: "groups",
+      args: [index],
+    }));
+
+    const groupResults = await multiCall(this.multicall3, this.gnsDiamond, groupCalls);
+
+    const groups = groupResults.map((groupResult) => {
+      const group = groupResult[0];
+      return {
+        name: group.name,
+        minLeverage: group.minLeverage,
+        maxLeverage: group.maxLeverage,
+      };
+    });
 
     const pairBorrowingCalls = collaterals.map(({ collateral }, index) => {
       return {
@@ -80,6 +100,12 @@ export class SDK {
 
     const markets: Market[] = pairResults.map((pairResult, pairIndex) => {
       const pair = pairResult[0];
+      const maxLeverage =
+        maxPairLeverages[pairIndex] === BigInt(0)
+          ? groups[Number(pair.groupIndex)].maxLeverage
+          : maxPairLeverages[pairIndex];
+      const minLeverage = groups[Number(pair.groupIndex)].minLeverage;
+
       return {
         from: pair.from,
         to: pair.to,
@@ -151,8 +177,9 @@ export class SDK {
         }),
         spreadP: pair.spreadP,
         feeIndex: pair.feeIndex,
-        maxLeverage: 150n, // @todo
-        isActive: true, // @todo
+        minLeverage: minLeverage,
+        maxLeverage: maxLeverage,
+        isActive: Number(maxLeverage) > 1,
       };
     });
     return markets;
