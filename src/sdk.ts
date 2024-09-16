@@ -41,7 +41,7 @@ export class SDK {
     return userTrades;
   }
 
-  public async getMarkets(): Promise<any> {
+  public async getMarkets(): Promise<Market[]> {
     const [collaterals, maxPairLeverages, groupCount] = await Promise.all([
       this.gnsDiamond.getCollaterals(),
       this.gnsDiamond.getAllPairsRestrictedMaxLeverage(),
@@ -183,6 +183,14 @@ export class SDK {
       };
     });
     return markets;
+  }
+
+  public async getPositions(account: string): Promise<any> {
+
+  }
+
+  public async getPositionsHistory(account: string): Promise<any> {
+    
   }
 
   // Write functions
