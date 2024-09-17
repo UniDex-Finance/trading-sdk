@@ -4,17 +4,16 @@ import { multiCall } from "./utils/multicallHelper";
 import { pairs as pairsSdk } from "@gainsnetwork/sdk";
 import { GNSDiamond, GNSDiamond__factory, Multicall3__factory } from "./types/contracts";
 import { Contract, ContractTransactionResponse, ethers, keccak256 } from "ethers";
+import { Market, Pair, Position } from "./types";
+import { ModifyPositionTxType, ModifyPositionTxArgs, OpenTradeTxArgs, CloseTradeMarketTxArgs } from "./types/tx";
 import {
-  Market,
-  Pair,
-  ModifyPositionDirection,
-  ModifyPositionParams,
-  SubmitConditionalOrderParams,
-  CancelConditionalOrderParams,
-  Position,
-  PendingTransactionDetails,
-} from "./types";
-import { ShadowWallet } from "./libs/ShadowWallet";
+  buildCloseTradeMarketTx,
+  buildOpenTradeTx,
+  buildUpdateLeverageTx,
+  buildUpdatePositionSizeTx,
+  buildUpdateSlTx,
+  buildUpdateTpTx,
+} from "./libs/tx";
 
 export class SDK {
   private chainId: SupportedChainId;
@@ -300,9 +299,10 @@ export class SDK {
           uPnL: 0n,
           uPnLP: 0n,
         },
-        maxLeverage: maxPairLeverages[pairIndexNum] === BigInt(0)
-          ? groups[Number(groupIndexNum)].maxLeverage
-          : maxPairLeverages[pairIndexNum],
+        maxLeverage:
+          maxPairLeverages[pairIndexNum] === BigInt(0)
+            ? groups[Number(groupIndexNum)].maxLeverage
+            : maxPairLeverages[pairIndexNum],
       };
     });
   }
@@ -311,153 +311,52 @@ export class SDK {
     return [];
   }
 
-  // Write functions
-  public async createAccount() {}
+  get build() {
+    return {
+      modifyPosition: async (args: ModifyPositionTxArgs) => {
+        if (
+          args.type === ModifyPositionTxType.INCREASE_POSITION_SIZE ||
+          args.type === ModifyPositionTxType.DECREASE_POSITION_SIZE
+        ) {
+          return buildUpdatePositionSizeTx(this.gnsDiamond, args);
+        }
 
-  public async modifyPosition({
-    index,
-    collateralDelta,
-    leverageDelta,
-    direction,
-    slippageP,
-    expectedPrice,
-  }: ModifyPositionParams) {
-    if (!this.signer) {
-      return null;
-    }
+        if (args.type === ModifyPositionTxType.UPDATE_SL) {
+          return buildUpdateSlTx(this.gnsDiamond, args);
+        }
 
-    const _leveragedDelta = Math.floor(leverageDelta * 1e3);
-    const _slippageP = BigInt(Math.floor(slippageP * 1e3));
-    const _expectedPrice = BigInt(Math.floor(expectedPrice * 1e10));
+        if (args.type === ModifyPositionTxType.UPDATE_TP) {
+          return buildUpdateTpTx(this.gnsDiamond, args);
+        }
 
-    let tx: ContractTransactionResponse | null = null;
-
-    if (direction === ModifyPositionDirection.INCREASE) {
-      tx = await this.gnsDiamond.increasePositionSize(
-        index,
-        collateralDelta,
-        _leveragedDelta,
-        _expectedPrice,
-        _slippageP
-      );
-    } else if (direction === ModifyPositionDirection.DECREASE) {
-      const trader = await this.signer.getAddress();
-      const tradeInfo = await this.gnsDiamond.getTradeInfo(trader, index);
-
-      if (tradeInfo.maxSlippageP === _slippageP) {
-        tx = await this.gnsDiamond.decreasePositionSize(index, collateralDelta, _leveragedDelta, _expectedPrice);
-      } else {
-        tx = await this.gnsDiamond.multicall([
-          this.gnsDiamond.interface.encodeFunctionData("updateMaxClosingSlippageP", [index, _slippageP]),
-          this.gnsDiamond.interface.encodeFunctionData("decreasePositionSize", [
-            index,
-            collateralDelta,
-            _leveragedDelta,
-            _expectedPrice,
-          ]),
-        ]);
-      }
-    }
-
-    return tx;
-  }
-
-  public async submitConditionalOrder({
-    user,
-    pairIndex,
-    collateralAmount,
-    openPrice,
-    long,
-    leverage,
-    tp,
-    sl,
-    collateralIndex,
-    tradeType,
-    maxSlippage,
-    ref,
-  }: SubmitConditionalOrderParams) {
-    if (!this.signer) {
-      return null;
-    }
-
-    const tradeData = {
-      user,
-      pairIndex,
-      index: 0,
-      collateralAmount,
-      openPrice: openPrice.toString(),
-      long,
-      leverage: Math.floor(leverage * 1e3),
-      tp: Math.floor(tp).toString(),
-      sl: Math.floor(sl).toString(),
-      isOpen: true,
-      collateralIndex,
-      tradeType,
-      __placeholder: "0",
+        if (args.type === ModifyPositionTxType.UPDATE_LEVERAGE) {
+          return buildUpdateLeverageTx(this.gnsDiamond, args);
+        }
+      },
+      openTrade: async (args: OpenTradeTxArgs) => {
+        return buildOpenTradeTx(this.gnsDiamond, args);
+      },
+      closeTradeMarket: async (args: CloseTradeMarketTxArgs) => {
+        return buildCloseTradeMarketTx(this.gnsDiamond, args);
+      },
     };
-
-    const tx = await this.gnsDiamond.openTrade(
-      tradeData,
-      Math.floor(maxSlippage * 1e3).toString(),
-      ref ?? "0x0000000000000000000000000000000000000000"
-    );
-
-    return tx;
   }
 
-  public async cancelConditionalOrder({ index, slippageP, expectedPrice }: CancelConditionalOrderParams) {
+  get write() {
     if (!this.signer) {
-      return null;
+      throw new Error("Signer requried for write methods");
     }
 
-    const _expectedPrice = BigInt(Math.floor(expectedPrice * 1e10));
-    const _slippageP = slippageP !== undefined ? BigInt(Math.floor(slippageP * 1e3)) : undefined;
-
-    if (_slippageP !== undefined) {
-      const trader = await this.signer.getAddress();
-      const tradeInfo = await this.gnsDiamond.getTradeInfo(trader, index);
-      if (tradeInfo.maxSlippageP !== _slippageP) {
-        return await this.gnsDiamond.multicall([
-          this.gnsDiamond.interface.encodeFunctionData("updateMaxClosingSlippageP", [index, _slippageP]),
-          this.gnsDiamond.interface.encodeFunctionData("closeTradeMarket", [index, _expectedPrice]),
-        ]);
-      }
-    }
-
-    return await this.gnsDiamond.closeTradeMarket(index, _expectedPrice);
-  }
-
-  public async modifyAccountMargin() {}
-
-  public async getShadowWallet(
-    pin: string,
-    getPendingTransactionDetails: (chainId, address) => PendingTransactionDetails
-  ) {
-    if (!this.signer) {
-      return null;
-    }
-
-    const msg = `Your One-Click Trading PIN: ${pin}`;
-    const signedMsg = await this.signer.signMessage(msg);
-    const shadowKey = keccak256(signedMsg);
-    const provider = this.signer.provider as any;
-
-    return new ShadowWallet(shadowKey, provider, this.chainId, getPendingTransactionDetails);
-  }
-
-  public async addDelegate(shadowWallet: ShadowWallet) {
-    if (!this.signer) {
-      return null;
-    }
-
-    return await this.gnsDiamond.setTradingDelegate(shadowWallet.address);
-  }
-
-  public async removeDelegate() {
-    if (!this.signer) {
-      return null;
-    }
-
-    return await this.gnsDiamond.removeTradingDelegate();
+    return {
+      modifyPosition: async (args: ModifyPositionTxArgs) => {
+        throw new Error("Not implemented");
+      },
+      openTrade: async (args: OpenTradeTxArgs) => {
+        throw new Error("Not implemented");
+      },
+      closeTradeMarket: async (args: CloseTradeMarketTxArgs) => {
+        throw new Error("Not implemented");
+      },
+    };
   }
 }

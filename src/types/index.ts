@@ -48,41 +48,6 @@ export type Pair = {
   spreadP: bigint;
 };
 
-export enum ModifyPositionDirection {
-  INCREASE,
-  DECREASE,
-}
-
-export type ModifyPositionParams = {
-  index: number; // => marketId
-  collateralDelta: bigint; // => sizeDelta
-  leverageDelta: number; // => marginDelta
-  direction: ModifyPositionDirection;
-  slippageP: number;
-  expectedPrice: number;
-};
-
-export type SubmitConditionalOrderParams = {
-  user: string;
-  pairIndex: number;
-  collateralAmount: bigint;
-  openPrice: number;
-  long: boolean;
-  leverage: number;
-  tp: number;
-  sl: number;
-  collateralIndex: number;
-  tradeType: number;
-  maxSlippage: number;
-  ref?: string;
-};
-
-export type CancelConditionalOrderParams = {
-  index: number;
-  expectedPrice: number;
-  slippageP?: number;
-};
-
 export type PendingTransactionDetails = {
   count: number;
   latestNonce: number;
