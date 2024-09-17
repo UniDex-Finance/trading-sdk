@@ -1,7 +1,7 @@
 import { getProvider } from "./utils/provider";
 import { GNS_DIAMOND_ADDRESSES, MULTICALL3_ADDRESS, SupportedChainId } from "./config/constants";
 import { multiCall } from "./utils/multicallHelper";
-import { pairs } from "@gainsnetwork/sdk";
+import { pairs as pairsSdk } from "@gainsnetwork/sdk";
 import { GNSDiamond, GNSDiamond__factory, Multicall3__factory } from "./types/contracts";
 import { Contract, ContractTransactionResponse, ethers, keccak256 } from "ethers";
 import {
@@ -21,6 +21,9 @@ export class SDK {
   private signer?: ethers.Signer;
   private gnsDiamond: GNSDiamond;
   private multicall3: Contract;
+  private state: any; // @todo add type
+  public lastRefreshedTs: number = Date.now();
+  public initialized: boolean = false;
 
   constructor(chainId: SupportedChainId, signer?: ethers.Signer) {
     this.chainId = chainId;
@@ -32,14 +35,18 @@ export class SDK {
     this.multicall3 = new ethers.Contract(MULTICALL3_ADDRESS, Multicall3__factory.abi, runner);
   }
 
-  public async getMarkets(): Promise<Market[]> {
+  public async initialize() {
+    await this.refreshState();
+    this.initialized = true;
+  }
+
+  public async refreshState() {
     const [collaterals, maxPairLeverages, groupCount] = await Promise.all([
       this.gnsDiamond.getCollaterals(),
       this.gnsDiamond.getAllPairsRestrictedMaxLeverage(),
       this.gnsDiamond.groupsCount(),
     ]);
-
-    const pairCount = true ? 5 : Object.keys(pairs).length; // @kuko todo: remove 5 to get all markets
+    const pairCount = false ? 5 : Object.keys(pairsSdk).length; // @kuko todo: remove 5 to get all markets
 
     const pairCalls = Array.from({ length: pairCount }, (_, index) => ({
       functionName: "pairs",
@@ -47,6 +54,17 @@ export class SDK {
     }));
 
     const pairResults: [Pair][] = await multiCall(this.multicall3, this.gnsDiamond, pairCalls);
+
+    const pairs = pairResults.map((pairResult) => {
+      const pair = pairResult[0];
+      return {
+        from: pair.from,
+        to: pair.to,
+        groupIndex: pair.groupIndex,
+        spreadP: pair.spreadP,
+        feeIndex: pair.feeIndex,
+      };
+    });
 
     const groupCalls = Array.from({ length: Number(groupCount) }, (_, index) => ({
       functionName: "groups",
@@ -64,17 +82,17 @@ export class SDK {
       };
     });
 
-    const pairBorrowingCalls = collaterals.map(({ collateral }, index) => {
+    const pairBorrowingFeesCalls = collaterals.map(({ collateral }, index) => {
       return {
         functionName: "getAllBorrowingPairs",
         args: [index + 1],
       };
     });
 
-    const pairBorrowingResultsPerCollateral = await multiCall(this.multicall3, this.gnsDiamond, pairBorrowingCalls);
+    const pairBorrowingFees = await multiCall(this.multicall3, this.gnsDiamond, pairBorrowingFeesCalls);
 
-    const groupBorrowingCalls = collaterals.map(({ collateral }, index) => {
-      const pairBorrowingResult = pairBorrowingResultsPerCollateral[index];
+    const groupBorrowingFeesCalls = collaterals.map(({ collateral }, index) => {
+      const pairBorrowingResult = pairBorrowingFees[index];
       const borrowingFeesGroupIds = [
         ...new Set<bigint>(pairBorrowingResult[2].map((pair: Pair[]) => pair.map((pair) => pair.groupIndex)).flat()),
       ].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
@@ -87,10 +105,23 @@ export class SDK {
       };
     });
 
-    const groupBorrowingResultsPerCollateral = await multiCall(this.multicall3, this.gnsDiamond, groupBorrowingCalls);
+    const groupBorrowingFees = await multiCall(this.multicall3, this.gnsDiamond, groupBorrowingFeesCalls);
 
-    const markets: Market[] = pairResults.map((pairResult, pairIndex) => {
-      const pair = pairResult[0];
+    this.lastRefreshedTs = Date.now();
+    this.state = {
+      collaterals,
+      groups,
+      pairs,
+      maxPairLeverages,
+      groupBorrowingFees,
+      pairBorrowingFees,
+    };
+  }
+
+  public async getMarkets(): Promise<Market[]> {
+    const { collaterals, groups, pairs, maxPairLeverages, pairBorrowingFees, groupBorrowingFees } = this.state;
+
+    const markets: Market[] = pairs.map((pair, pairIndex) => {
       const maxLeverage =
         maxPairLeverages[pairIndex] === BigInt(0)
           ? groups[Number(pair.groupIndex)].maxLeverage
@@ -104,7 +135,7 @@ export class SDK {
         index: pairIndex,
         pairBorrowingFees: collaterals.map(({ collateral }, collateralIndex) => {
           const { feePerBlock, accFeeLong, accFeeShort, accLastUpdatedBlock, feeExponent } =
-            pairBorrowingResultsPerCollateral[collateralIndex][0][pairIndex];
+            pairBorrowingFees[collateralIndex][0][pairIndex];
           const {
             groupIndex,
             block,
@@ -114,7 +145,7 @@ export class SDK {
             prevGroupAccFeeShort,
             pairAccFeeLong,
             pairAccFeeShort,
-          } = pairBorrowingResultsPerCollateral[collateralIndex][2][pairIndex][0];
+          } = pairBorrowingFees[collateralIndex][2][pairIndex][0];
           return {
             feePerBlock,
             accFeeLong,
@@ -134,7 +165,7 @@ export class SDK {
           };
         }),
         groupBorrowingFees: collaterals.map(({ collateral }, collateralIndex) => {
-          return groupBorrowingResultsPerCollateral[collateralIndex][0].map((groupBorrowingFees) => {
+          return groupBorrowingFees[collateralIndex][0].map((groupBorrowingFees) => {
             const { accFeeLong, accFeeShort, accLastUpdatedBlock, feeExponent, feePerBlock } = groupBorrowingFees;
             return {
               accFeeLong,
@@ -146,13 +177,13 @@ export class SDK {
           });
         }),
         openInterests: collaterals.map(({ collateral }, collateralIndex) => {
-          const { long, short, max } = pairBorrowingResultsPerCollateral[collateralIndex][1][pairIndex];
-          const { groupIndex } = pairBorrowingResultsPerCollateral[collateralIndex][2][pairIndex][0];
+          const { long, short, max } = pairBorrowingFees[collateralIndex][1][pairIndex];
+          const { groupIndex } = pairBorrowingFees[collateralIndex][2][pairIndex][0];
           const {
             long: groupLong,
             short: groupShort,
             max: groupMax,
-          } = groupBorrowingResultsPerCollateral[collateralIndex][1][Number(groupIndex)];
+          } = groupBorrowingFees[collateralIndex][1][Number(groupIndex)];
           return {
             pair: {
               long,
@@ -177,11 +208,11 @@ export class SDK {
   }
 
   public async getPositions(account: string): Promise<Position[]> {
-    const [trades, tradeInfos, liquidationParams, collaterals] = await Promise.all([
+    const { maxPairLeverages, groups } = this.state;
+    const [trades, tradeInfos, liquidationParams] = await Promise.all([
       this.gnsDiamond.getTrades(account),
       this.gnsDiamond.getTradeInfos(account),
       this.gnsDiamond.getTradesLiquidationParams(account),
-      this.gnsDiamond.getCollaterals(),
     ]);
 
     const initialAccFeesCalls = trades
@@ -250,8 +281,10 @@ export class SDK {
       const { trade, tradeInfo } = tradeContainer;
       const posSize = trade.collateralAmount * trade.leverage;
       const posSizeInToken = (posSize * tradeInfo.collateralPriceUsd) / trade.openPrice;
+      const pairIndexNum = Number(trade.pairIndex);
+      const groupIndexNum = Number(this.state.pairs[pairIndexNum].groupIndex);
       return {
-        index: Number(trade.pairIndex),
+        index: pairIndexNum,
         long: trade.long,
         openPrice: trade.openPrice,
         positionSize: posSize,
@@ -267,7 +300,9 @@ export class SDK {
           uPnL: 0n,
           uPnLP: 0n,
         },
-        maxLeverage: 0n, // @todo
+        maxLeverage: maxPairLeverages[pairIndexNum] === BigInt(0)
+          ? groups[Number(groupIndexNum)].maxLeverage
+          : maxPairLeverages[pairIndexNum],
       };
     });
   }

@@ -8,7 +8,7 @@ async function runTest() {
     const USER_ADDRESS = "0xa110CC27a19f6853e9Aa8Bb8e2C603D7b02ea2df";
 
     console.log("[test] Onchain call...");
-
+    await sdk.initialize();
     // getMarkets()
     // const response = await sdk.getMarkets();
 
