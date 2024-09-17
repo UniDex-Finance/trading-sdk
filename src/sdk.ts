@@ -189,13 +189,39 @@ export class SDK {
   }
 
   public async getPositions(account: string): Promise<Position[]> {
-    const [trades, tradeInfos] = await Promise.all([
+    const [trades, tradeInfos, liquidationParams, collaterals] = await Promise.all([
       this.gnsDiamond.getTrades(account),
       this.gnsDiamond.getTradeInfos(account),
+      this.gnsDiamond.getTradesLiquidationParams(account),
+      this.gnsDiamond.getCollaterals(),
     ]);
+
+    const initialAccFeesCalls = trades
+      .map((trade) => ({
+        collateralIndex: trade.collateralIndex,
+        user: trade.user,
+        index: trade.index,
+      }))
+      .map(({ collateralIndex, user, index }) => {
+        return {
+          functionName: "getBorrowingInitialAccFees",
+          args: [collateralIndex, user, index],
+        };
+      });
+    const initialAccFeesResults = await multiCall(this.multicall3, this.gnsDiamond, initialAccFeesCalls);
+    const initialAccFees = initialAccFeesResults.map((initialAccFeesResult) => {
+      const initialAccFee = initialAccFeesResult[0];
+      return {
+        accPairFee: initialAccFee.accPairFee,
+        accGroupFee: initialAccFee.accGroupFee,
+        block: initialAccFee.block,
+      };
+    });
 
     const userTrades = trades.map((trade, index) => {
       const tradeInfo = tradeInfos[index];
+      const liqParams = liquidationParams[index];
+      const initialAccFee = initialAccFees[index];
       return {
         trade: {
           user: trade.user,
@@ -221,17 +247,27 @@ export class SDK {
           contractsVersion: tradeInfo.contractsVersion,
           lastPosIncreaseBlock: tradeInfo.lastPosIncreaseBlock,
         },
+        liquidationParams: {
+          maxLiqSpreadP: liqParams.maxLiqSpreadP,
+          startLiqThresholdP: liqParams.startLiqThresholdP,
+          endLiqThresholdP: liqParams.endLiqThresholdP,
+          startLeverage: liqParams.startLeverage,
+          endLeverage: liqParams.endLeverage,
+        },
+        initialAccFees: initialAccFee,
       };
     });
 
     return userTrades.map((tradeContainer) => {
       const { trade, tradeInfo } = tradeContainer;
+      const posSize = trade.collateralAmount * trade.leverage;
+      const posSizeInToken = (posSize * tradeInfo.collateralPriceUsd) / trade.openPrice;
       return {
         index: Number(trade.pairIndex),
         long: trade.long,
         openPrice: trade.openPrice,
-        positionSize: trade.collateralAmount * trade.leverage,
-        positionSizeInToken: 0n, // @todo
+        positionSize: posSize,
+        positionSizeInToken: posSizeInToken,
         borrowingFee: 0n, // @todo
         closingFee: 0n, // @todo
         liquidationPrice: 0n, // @todo
