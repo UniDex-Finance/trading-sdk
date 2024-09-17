@@ -32,18 +32,6 @@ export class SDK {
     this.multicall3 = new ethers.Contract(MULTICALL3_ADDRESS, Multicall3__factory.abi, runner);
   }
 
-  public async getAllTrades(offset: number, limit: number): Promise<any> {
-    const allTrades = await this.gnsDiamond.getAllTrades(offset, limit);
-
-    return allTrades;
-  }
-
-  public async getUserTrades(userAddress: string): Promise<any> {
-    const userTrades = await this.gnsDiamond.getTrades(userAddress);
-
-    return userTrades;
-  }
-
   public async getMarkets(): Promise<Market[]> {
     const [collaterals, maxPairLeverages, groupCount] = await Promise.all([
       this.gnsDiamond.getCollaterals(),
