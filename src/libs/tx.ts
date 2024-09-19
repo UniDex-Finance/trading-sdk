@@ -6,6 +6,8 @@ import {
   UpdateSlTxArgs,
   UpdateTpTxArgs,
   CloseTradeMarketTxArgs,
+  UpdateOpenOrderTxArgs,
+  updateMaxClosingSlippagePTxArgs,
 } from "../types/tx";
 import { GNSDiamond } from "../types/contracts";
 
@@ -98,6 +100,33 @@ export async function buildUpdateLeverageTx(gnsDiamond: GNSDiamond, args: Update
   const gnsDiamondAddress = await gnsDiamond.getAddress();
 
   const data = gnsDiamond.interface.encodeFunctionData("updateLeverage", [index, leverage]);
+  return { data, to: gnsDiamondAddress };
+}
+
+export async function buildUpdateOpenOrderTx(gnsDiamond: GNSDiamond, args: UpdateOpenOrderTxArgs) {
+  const { index } = args;
+  const triggerPrice = BigInt(Math.floor(args.triggerPrice * 1e10));
+  const takeProfitPrice = BigInt(Math.floor(args.takeProfitPrice * 1e10));
+  const stopLossPrice = BigInt(Math.floor(args.stopLossPrice * 1e10));
+  const maxSlippageP = BigInt(Math.floor(args.maxSlippageP * 1e3));
+  const gnsDiamondAddress = await gnsDiamond.getAddress();
+
+  const data = gnsDiamond.interface.encodeFunctionData("updateOpenOrder", [
+    index,
+    triggerPrice,
+    takeProfitPrice,
+    stopLossPrice,
+    maxSlippageP,
+  ]);
+  return { data, to: gnsDiamondAddress };
+}
+
+export async function buildUpdateMaxClosingSlippagePTx(gnsDiamond: GNSDiamond, args: updateMaxClosingSlippagePTxArgs) {
+  const { index } = args;
+  const maxSlippageP = BigInt(Math.floor(args.maxSlippageP * 1e3));
+  const gnsDiamondAddress = await gnsDiamond.getAddress();
+
+  const data = gnsDiamond.interface.encodeFunctionData("updateMaxClosingSlippageP", [index, maxSlippageP]);
   return { data, to: gnsDiamondAddress };
 }
 

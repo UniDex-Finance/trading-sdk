@@ -10,6 +10,8 @@ import {
   buildCloseTradeMarketTx,
   buildOpenTradeTx,
   buildUpdateLeverageTx,
+  buildUpdateMaxClosingSlippagePTx,
+  buildUpdateOpenOrderTx,
   buildUpdatePositionSizeTx,
   buildUpdateSlTx,
   buildUpdateTpTx,
@@ -469,6 +471,14 @@ export class SDK {
 
         if (args.type === ModifyPositionTxType.UPDATE_LEVERAGE) {
           return buildUpdateLeverageTx(this.gnsDiamond, args);
+        }
+
+        if (args.type === ModifyPositionTxType.UPDATE_OPEN_ORDER) {
+          return buildUpdateOpenOrderTx(this.gnsDiamond, args);
+        }
+
+        if (args.type === ModifyPositionTxType.UPDATE_MAX_CLOSING_SLIPPAGE_P) {
+          return buildUpdateMaxClosingSlippagePTx(this.gnsDiamond, args);
         }
       },
       openTrade: async (args: OpenTradeTxArgs) => {

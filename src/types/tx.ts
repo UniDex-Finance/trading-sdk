@@ -4,6 +4,8 @@ export enum ModifyPositionTxType {
   UPDATE_SL,
   UPDATE_TP,
   UPDATE_LEVERAGE,
+  UPDATE_OPEN_ORDER,
+  UPDATE_MAX_CLOSING_SLIPPAGE_P,
 }
 
 export type UpdatePositionSizeTxArgs = {
@@ -36,7 +38,28 @@ export type UpdateLeverageTxArgs = {
   leverage: number;
 };
 
-export type ModifyPositionTxArgs = UpdatePositionSizeTxArgs | UpdateSlTxArgs | UpdateTpTxArgs | UpdateLeverageTxArgs;
+export type UpdateOpenOrderTxArgs = {
+  type: ModifyPositionTxType.UPDATE_OPEN_ORDER;
+  index: number;
+  triggerPrice: number;
+  takeProfitPrice: number;
+  stopLossPrice: number;
+  maxSlippageP: number;
+};
+
+export type updateMaxClosingSlippagePTxArgs = {
+  type: ModifyPositionTxType.UPDATE_MAX_CLOSING_SLIPPAGE_P;
+  index: number;
+  maxSlippageP: number;
+};
+
+export type ModifyPositionTxArgs =
+  | UpdatePositionSizeTxArgs
+  | UpdateSlTxArgs
+  | UpdateTpTxArgs
+  | UpdateLeverageTxArgs
+  | UpdateOpenOrderTxArgs
+  | updateMaxClosingSlippagePTxArgs;
 
 export type OpenTradeTxArgs = {
   user: string;
