@@ -1,7 +1,7 @@
 import { getProvider } from "./utils/provider";
 import { GNS_DIAMOND_ADDRESSES, MULTICALL3_ADDRESS, SupportedChainId } from "./config/constants";
 import { multiCall } from "./utils/multicallHelper";
-import { pairs as pairsSdk } from "@gainsnetwork/sdk";
+import { getCurrentDay, pairs as pairsSdk } from "@gainsnetwork/sdk";
 import { GNSDiamond, GNSDiamond__factory, Multicall3__factory } from "./types/contracts";
 import { Contract, ContractTransactionResponse, ethers, keccak256 } from "ethers";
 import { Market, Pair, Position } from "./types";
@@ -357,6 +357,90 @@ export class SDK {
             : maxPairLeverages[pairIndexNum],
       };
     });
+  }
+
+  public async getTraderFeeTiers(account: string): Promise<any> {
+    const currentDay = getCurrentDay();
+    const expiringDay = currentDay - 30;
+    const [
+      { lastDayUpdated: lastDayUpdatedRaw, trailingPoints: trailingPointsRaw },
+      { feeMultiplierCache: currentFeeMultiplierCacheRaw, points: currentPointsRaw },
+      { feeMultiplierCache: expiringFeeMultiplierCacheRaw, points: expiringPointsRaw },
+      { status: traderEnrollmentStatus }
+    ] = (
+      await multiCall(this.multicall3, this.gnsDiamond, [
+        {
+          functionName: "getFeeTiersTraderInfo",
+          args: [account],
+        },
+        {
+          functionName: "getFeeTiersTraderDailyInfo",
+          args: [account, currentDay],
+        },
+        {
+          functionName: "getFeeTiersTraderDailyInfo",
+          args: [account, expiringDay],
+        },
+        {
+          functionName: "getTraderFeeTiersEnrollment",
+          args: [account],
+        }
+      ])
+    ).map((result) => result[0]);
+
+    const traderInfo = {
+      lastDayUpdated: lastDayUpdatedRaw,
+      trailingPoints: trailingPointsRaw,
+    };
+
+    const currentTraderDailyInfo = {
+      feeMultiplierCache: currentFeeMultiplierCacheRaw,
+      points: currentPointsRaw,
+    };
+
+    const expiringTraderDailyInfo = {
+      feeMultiplierCache: expiringFeeMultiplierCacheRaw,
+      points: expiringPointsRaw,
+    };
+
+    const calls: { functionName: string; args: (string | number)[] }[] = [];
+
+    if (traderInfo.lastDayUpdated > BigInt(0)) {
+      const earliestExpiredDay = Math.max(Number(traderInfo.lastDayUpdated) - 30, expiringDay - 30);
+
+      for (let day = expiringDay - 1; day >= earliestExpiredDay; day--) {
+        calls.push({
+          functionName: "getFeeTiersTraderDailyInfo",
+          args: [account, day],
+        });
+      }
+    }
+    calls.push({
+      functionName: "getFeeTiersTraderDailyInfo",
+      args: [account, traderInfo.lastDayUpdated],
+    });
+
+    const daysInfoResults = await multiCall(this.multicall3, this.gnsDiamond, calls);
+    const daysInfo = daysInfoResults.map((dayInfoResult) => {
+      const dayInfo = dayInfoResult[0];
+      return {
+        points: dayInfo.points,
+        feeMultiplierCache: dayInfo.feeMultiplierCache,
+      };
+    });
+    const expiredDaysInfo = daysInfo.slice(0, -1);
+    const lastDayUpdatedInfo = daysInfo[daysInfo.length - 1];
+    return {
+      traderInfo: {
+        lastDayUpdated: traderInfo.lastDayUpdated,
+        trailingPoints: traderInfo.trailingPoints,
+      },
+      traderEnrollment: { status: traderEnrollmentStatus },
+      lastDayUpdatedPoints: lastDayUpdatedInfo.points,
+      inboundPoints: currentTraderDailyInfo.points,
+      outboundPoints: expiringTraderDailyInfo.points,
+      expiredPoints: expiredDaysInfo.map((dayInfo) => dayInfo.points),
+    };
   }
 
   public async getPositionsHistory(account: string): Promise<Position[]> {
