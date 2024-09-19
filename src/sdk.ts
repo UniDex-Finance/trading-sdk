@@ -40,12 +40,14 @@ export class SDK {
   }
 
   public async refreshState() {
-    const [collaterals, maxPairLeverages, groupCount] = await Promise.all([
+    const [collaterals, maxPairLeverages, groupsCount, feesCount, feeTiersCount] = await Promise.all([
       this.gnsDiamond.getCollaterals(),
       this.gnsDiamond.getAllPairsRestrictedMaxLeverage(),
       this.gnsDiamond.groupsCount(),
+      this.gnsDiamond.feesCount(),
+      this.gnsDiamond.getFeeTiersCount(),
     ]);
-    const pairCount = false ? 5 : Object.keys(pairsSdk).length; // @kuko todo: remove 5 to get all markets
+    const pairCount = true ? 5 : Object.keys(pairsSdk).length; // @kuko todo: remove 5 to get all markets
 
     const pairCalls = Array.from({ length: pairCount }, (_, index) => ({
       functionName: "pairs",
@@ -65,14 +67,14 @@ export class SDK {
       };
     });
 
-    const groupCalls = Array.from({ length: Number(groupCount) }, (_, index) => ({
+    const groupCalls = Array.from({ length: Number(groupsCount) }, (_, index) => ({
       functionName: "groups",
       args: [index],
     }));
 
-    const groupResults = await multiCall(this.multicall3, this.gnsDiamond, groupCalls);
+    const groupsResults = await multiCall(this.multicall3, this.gnsDiamond, groupCalls);
 
-    const groups = groupResults.map((groupResult) => {
+    const groups = groupsResults.map((groupResult) => {
       const group = groupResult[0];
       return {
         name: group.name,
@@ -80,6 +82,46 @@ export class SDK {
         maxLeverage: group.maxLeverage,
       };
     });
+
+    const feesCalls = Array.from({ length: Number(feesCount) }, (_, index) => ({
+      functionName: "fees",
+      args: [index],
+    }));
+
+    const feesResults = await multiCall(this.multicall3, this.gnsDiamond, feesCalls);
+
+    const fees = feesResults.map((feeResult) => {
+      const fee = feeResult[0];
+      return {
+        openFeeP: fee.openFeeP,
+        closeFeeP: fee.closeFeeP,
+        oracleFeeP: fee.oracleFeeP,
+        triggerOrderFeeP: fee.triggerOrderFeeP,
+        minPositionSizeUsd: fee.minPositionSizeUsd,
+      };
+    });
+
+    const feeTiersCalls = Array.from({ length: Number(feeTiersCount) }, (_, index) => ({
+      functionName: "getFeeTier",
+      args: [index],
+    }));
+
+    const feeTiersResults = await multiCall(this.multicall3, this.gnsDiamond, feeTiersCalls);
+    const feeTiers = feeTiersResults.map((feeTierResult) => {
+      const feeTier = feeTierResult[0];
+      return {
+        feeMultiplier: feeTier.feeMultiplier,
+        pointsThreshold: feeTier.pointsThreshold,
+      };
+    });
+
+    const feeMultipliersCalls = Array.from({ length: Number(groupsCount) }, (_, index) => ({
+      functionName: "getGroupVolumeMultiplier",
+      args: [index],
+    }));
+
+    const feeMultipliersResults = await multiCall(this.multicall3, this.gnsDiamond, feeMultipliersCalls);
+    const feeMultipliers = feeMultipliersResults.map((feeMultiplierResult) => feeMultiplierResult[0]);
 
     const pairBorrowingFeesCalls = collaterals.map(({ collateral }, index) => {
       return {
@@ -111,10 +153,20 @@ export class SDK {
       collaterals,
       groups,
       pairs,
+      fees,
       maxPairLeverages,
       groupBorrowingFees,
       pairBorrowingFees,
+      maxGainP: 900,
+      feeTiers: {
+        multipliers: feeMultipliers,
+        tiers: feeTiers,
+      },
     };
+  }
+
+  public async getState(): Promise<any> {
+    return this.state;
   }
 
   public async getMarkets(): Promise<Market[]> {
@@ -281,7 +333,7 @@ export class SDK {
       const posSize = trade.collateralAmount * trade.leverage;
       const posSizeInToken = (posSize * tradeInfo.collateralPriceUsd) / trade.openPrice;
       const pairIndexNum = Number(trade.pairIndex);
-      const groupIndexNum = Number(this.state.pairs[pairIndexNum].groupIndex);
+      const groupIndexNum = Number(this.state.pairs[pairIndexNum]?.groupIndex || 0);
       return {
         index: pairIndexNum,
         long: trade.long,
