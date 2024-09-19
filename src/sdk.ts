@@ -335,17 +335,19 @@ export class SDK {
       const pairIndexNum = Number(trade.pairIndex);
       const groupIndexNum = Number(this.state.pairs[pairIndexNum]?.groupIndex || 0);
       return {
-        index: pairIndexNum,
+        user: trade.user,
+        pairIndex: pairIndexNum,
+        index: trade.index,
         long: trade.long,
         openPrice: trade.openPrice,
         positionSize: posSize,
         positionSizeInToken: posSizeInToken,
-        borrowingFee: 0n, // @todo
-        closingFee: 0n, // @todo
-        liquidationPrice: 0n, // @todo
+        borrowingFee: 0n, // @calc
+        closingFee: 0n, // @calc
+        liquidationPrice: 0n, // @calc
         leverage: trade.leverage,
         pnl: {
-          // @todo
+          // @calc
           netPnl: 0n,
           netPnlP: 0n,
           uPnL: 0n,

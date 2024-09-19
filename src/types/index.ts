@@ -14,7 +14,9 @@ export interface Market {
 }
 
 export interface Position {
-  index: number; // => marketKey
+  pairIndex: number; // => marketKey
+  user: string;
+  index: bigint;
   long: boolean; // => side
   openPrice: bigint; // => avgEntryPrice
   positionSize: bigint; // => notionalValue
