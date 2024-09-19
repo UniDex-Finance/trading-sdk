@@ -368,7 +368,7 @@ export class SDK {
       { lastDayUpdated: lastDayUpdatedRaw, trailingPoints: trailingPointsRaw },
       { feeMultiplierCache: currentFeeMultiplierCacheRaw, points: currentPointsRaw },
       { feeMultiplierCache: expiringFeeMultiplierCacheRaw, points: expiringPointsRaw },
-      { status: traderEnrollmentStatus }
+      { status: traderEnrollmentStatus },
     ] = (
       await multiCall(this.multicall3, this.gnsDiamond, [
         {
@@ -386,7 +386,7 @@ export class SDK {
         {
           functionName: "getTraderFeeTiersEnrollment",
           args: [account],
-        }
+        },
       ])
     ).map((result) => result[0]);
 
@@ -487,13 +487,32 @@ export class SDK {
 
     return {
       modifyPosition: async (args: ModifyPositionTxArgs) => {
-        throw new Error("Not implemented");
+        const tx = await this.build.modifyPosition(args);
+        const hash = await this.signer?.sendTransaction({ ...tx, chainId: this.chainId });
+
+        return hash;
       },
       openTrade: async (args: OpenTradeTxArgs) => {
-        throw new Error("Not implemented");
+        const tx = await this.build.openTrade(args);
+        const hash = await this.signer?.sendTransaction({ ...tx, chainId: this.chainId });
+
+        return hash;
       },
       closeTradeMarket: async (args: CloseTradeMarketTxArgs) => {
-        throw new Error("Not implemented");
+        const tx = await this.build.closeTradeMarket(args);
+        const hash = await this.signer?.sendTransaction({ ...tx, chainId: this.chainId });
+
+        return hash;
+      },
+      multicall: async (args: string[]) => {
+        const { hash } = await this.gnsDiamond.multicall(args);
+
+        return hash;
+      },
+      delegatedTradingAction: async (trader: string, calldata: string) => {
+        const { hash } = await this.gnsDiamond.delegatedTradingAction(trader, calldata);
+
+        return hash;
       },
     };
   }
