@@ -11,7 +11,7 @@ async function runTest() {
     await sdk.initialize();
 
     // getState()
-    // const response = await sdk.getState();
+    const response = await sdk.getState();
 
     // getMarkets()
     // const response = await sdk.getMarkets();
@@ -20,7 +20,7 @@ async function runTest() {
     // const response = await sdk.getPositions(USER_ADDRESS);
 
     // getTraderFeeTiers()
-    const response = await sdk.getTraderFeeTiers(USER_ADDRESS);
+    // const response = await sdk.getTraderFeeTiers(USER_ADDRESS);
 
     console.log("[test] Onchain response", response);
   } catch (error) {

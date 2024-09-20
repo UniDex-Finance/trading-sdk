@@ -1,10 +1,11 @@
 import { getProvider } from "./utils/provider";
 import { GNS_DIAMOND_ADDRESSES, MULTICALL3_ADDRESS, SupportedChainId } from "./config/constants";
 import { multiCall } from "./utils/multicallHelper";
-import { getCurrentDay, pairs as pairsSdk } from "@gainsnetwork/sdk";
+import { CollateralConfig, getCurrentDay, pairs as pairsSdk } from "@gainsnetwork/sdk";
 import { GNSDiamond, GNSDiamond__factory, Multicall3__factory } from "./types/contracts";
 import { Contract, ContractTransactionResponse, ethers, keccak256 } from "ethers";
 import { Market, Pair, Position } from "./types";
+import ERC20_ABI from "./abi/ERC20.json";
 import { ModifyPositionTxType, ModifyPositionTxArgs, OpenTradeTxArgs, CloseTradeMarketTxArgs } from "./types/tx";
 import {
   buildCloseTradeMarketTx,
@@ -16,13 +17,14 @@ import {
   buildUpdateSlTx,
   buildUpdateTpTx,
 } from "./libs/tx";
+import { convertCollateralConfig } from "./utils/dataConverter";
 
 export class SDK {
   private chainId: SupportedChainId;
   private signer?: ethers.Signer;
   private gnsDiamond: GNSDiamond;
   private multicall3: Contract;
-  private state: any; // @todo add type
+  private state: any;
   public lastRefreshedTs: number = Date.now();
   public initialized: boolean = false;
 
@@ -149,10 +151,26 @@ export class SDK {
     });
 
     const groupBorrowingFees = await multiCall(this.multicall3, this.gnsDiamond, groupBorrowingFeesCalls);
+    const tokenDecimals = await Promise.all([
+      ...collaterals.map(({ collateral }) => {
+        const token = new Contract(collateral, ERC20_ABI, getProvider(this.chainId));
+        return token.decimals() as Promise<bigint>;
+      }),
+    ]);
+    const collateralsWithDecimals = collaterals.map(({ collateral, precision, precisionDelta, isActive }, index) => {
+      return {
+        collateral,
+        decimals: tokenDecimals[index],
+        isActive,
+        precision,
+        precisionDelta,
+      };
+    });
+    const collateralConfigs = collateralsWithDecimals.map(convertCollateralConfig);
 
     this.lastRefreshedTs = Date.now();
     this.state = {
-      collaterals,
+      collaterals: collateralConfigs,
       groups,
       pairs,
       fees,

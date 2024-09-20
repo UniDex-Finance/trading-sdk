@@ -253,7 +253,7 @@ export const convertOiWindowsSettings = (
 });
 
 export const convertCollateralConfig = (
-  collateral: ITradingStorage.CollateralStruct & { decimals: BigNumberish }
+  collateral: Omit<ITradingStorage.CollateralStruct, "__placeholder"> & { decimals: BigNumberish }
 ): CollateralConfig => ({
   collateral: collateral.collateral as string,
   isActive: collateral.isActive,

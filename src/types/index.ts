@@ -1,3 +1,17 @@
+import { CollateralConfig } from "@gainsnetwork/sdk";
+
+// export type State = {
+//   collaterals: CollateralConfig[],
+//   groups,
+//   pairs,
+//   fees,
+//   maxPairLeverages,
+//   groupBorrowingFees,
+//   pairBorrowingFees,
+//   maxGainP: 900,
+//   feeTiers,
+// }
+
 export interface Market {
   from: string; // => marketName
   to: string; // => marketName
