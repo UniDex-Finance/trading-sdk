@@ -8,6 +8,8 @@ import { Market, Pair, Position } from "./types";
 import ERC20_ABI from "./abi/ERC20.json";
 import { ModifyPositionTxType, ModifyPositionTxArgs, OpenTradeTxArgs, CloseTradeMarketTxArgs } from "./types/tx";
 import {
+  buildCancelOpenOrderTx,
+  buildCancelOrderAfterTimeoutTx,
   buildCloseTradeMarketTx,
   buildOpenTradeTx,
   buildUpdateLeverageTx,
@@ -505,6 +507,12 @@ export class SDK {
       closeTradeMarket: async (args: CloseTradeMarketTxArgs) => {
         return buildCloseTradeMarketTx(this.gnsDiamond, args);
       },
+      cancelOpenOrder: async (index: number) => {
+        return buildCancelOpenOrderTx(this.gnsDiamond, index);
+      },
+      cancelOrderAfterTimeout: async (index: number) => {
+        return buildCancelOrderAfterTimeoutTx(this.gnsDiamond, index);
+      },
     };
   }
 
@@ -528,6 +536,18 @@ export class SDK {
       },
       closeTradeMarket: async (args: CloseTradeMarketTxArgs) => {
         const tx = await this.build.closeTradeMarket(args);
+        const hash = await this.signer?.sendTransaction({ ...tx, chainId: this.chainId });
+
+        return hash;
+      },
+      cancelOpenOrder: async (index: number) => {
+        const tx = await this.build.cancelOpenOrder(index);
+        const hash = await this.signer?.sendTransaction({ ...tx, chainId: this.chainId });
+
+        return hash;
+      },
+      cancelOrderAfterTimeout: async (index: number) => {
+        const tx = await this.build.cancelOrderAfterTimeout(index);
         const hash = await this.signer?.sendTransaction({ ...tx, chainId: this.chainId });
 
         return hash;

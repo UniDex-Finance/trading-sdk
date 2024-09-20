@@ -173,3 +173,17 @@ export async function buildCloseTradeMarketTx(gnsDiamond: GNSDiamond, args: Clos
   const data = gnsDiamond.interface.encodeFunctionData("closeTradeMarket", [index, expectedPrice]);
   return { data, to: gnsDiamondAddress };
 }
+
+export async function buildCancelOpenOrderTx(gnsDiamond: GNSDiamond, index: number) {
+  const gnsDiamondAddress = await gnsDiamond.getAddress();
+
+  const data = gnsDiamond.interface.encodeFunctionData("cancelOpenOrder", [index]);
+  return { data, to: gnsDiamondAddress };
+}
+
+export async function buildCancelOrderAfterTimeoutTx(gnsDiamond: GNSDiamond, index: number) {
+  const gnsDiamondAddress = await gnsDiamond.getAddress();
+
+  const data = gnsDiamond.interface.encodeFunctionData("cancelOrderAfterTimeout", [index]);
+  return { data, to: gnsDiamondAddress };
+}
