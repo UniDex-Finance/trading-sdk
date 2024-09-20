@@ -8,8 +8,9 @@
     "postinstall": "npm run generate-types",
     "generate-types": "typechain --target=ethers-v6 'src/abi/*.json' --out-dir src/types/contracts",
     "sdkTest": "ts-node tests/sdkTest.ts",
+    "sdkTest:build": "ts-node tests/buildTx.ts",
     "dev": "nodemon --watch 'src/**' --watch 'tests/**' --ext 'ts,json' --exec 'ts-node tests/sdkTest.ts'",
-    "typecheck": "pnpm generate-types && tsc --noEmit"
+    "typecheck": "npm generate-types && tsc --noEmit"
   },
   "author": "",
   "license": "ISC",

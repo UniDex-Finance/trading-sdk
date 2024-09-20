@@ -8,8 +8,12 @@ export enum ModifyPositionTxType {
   UPDATE_MAX_CLOSING_SLIPPAGE_P,
 }
 
+export type UpdatePositionSizeTxType =
+  | ModifyPositionTxType.INCREASE_POSITION_SIZE
+  | ModifyPositionTxType.DECREASE_POSITION_SIZE;
+
 export type UpdatePositionSizeTxArgs = {
-  type: ModifyPositionTxType.INCREASE_POSITION_SIZE | ModifyPositionTxType.DECREASE_POSITION_SIZE;
+  type: UpdatePositionSizeTxType;
   index: number;
   collateralDelta: bigint;
   leverageDelta: number;
