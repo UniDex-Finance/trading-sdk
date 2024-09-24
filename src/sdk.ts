@@ -1,10 +1,10 @@
 import { getProvider } from "./utils/provider";
 import { GNS_DIAMOND_ADDRESSES, MULTICALL3_ADDRESS, SupportedChainId } from "./config/constants";
 import { multiCall } from "./utils/multicallHelper";
-import { CollateralConfig, getCurrentDay, pairs as pairsSdk } from "@gainsnetwork/sdk";
+import { getCurrentDay, pairs as pairsSdk, TradeContainer } from "@gainsnetwork/sdk";
 import { GNSDiamond, GNSDiamond__factory, Multicall3__factory } from "./types/contracts";
-import { Contract, ContractTransactionResponse, ethers, keccak256 } from "ethers";
-import { Market, Pair, Position } from "./types";
+import { Contract, ethers } from "ethers";
+import { State } from "./types";
 import ERC20_ABI from "./abi/ERC20.json";
 import { ModifyPositionTxType, ModifyPositionTxArgs, OpenTradeTxArgs, CloseTradeMarketTxArgs } from "./types/tx";
 import {
@@ -19,14 +19,24 @@ import {
   buildUpdateSlTx,
   buildUpdateTpTx,
 } from "./libs/tx";
-import { convertCollateralConfig } from "./utils/dataConverter";
+import {
+  convertCollateralConfig,
+  convertFees,
+  convertFeeTiers,
+  convertGroupBorrowingFee,
+  convertPairBorrowingFee,
+  convertTradeContainer,
+  convertTradingGroups,
+  convertTradingPairs,
+} from "./utils/dataConverter";
+import { IBorrowingFees, IFeeTiers, IPairsStorage } from "./types/contracts/GNSDiamond";
 
 export class SDK {
   private chainId: SupportedChainId;
   private signer?: ethers.Signer;
   private gnsDiamond: GNSDiamond;
   private multicall3: Contract;
-  private state: any;
+  private state: State = {} as State;
   public lastRefreshedTs: number = Date.now();
   public initialized: boolean = false;
 
@@ -53,26 +63,20 @@ export class SDK {
       this.gnsDiamond.feesCount(),
       this.gnsDiamond.getFeeTiersCount(),
     ]);
-    const pairCount = true ? 5 : Object.keys(pairsSdk).length; // @kuko todo: remove 5 to get all markets
+
+    // pairs
+    const pairCount = false ? 5 : Object.keys(pairsSdk).length; // @kuko todo: remove 5 to get all markets
 
     const pairCalls = Array.from({ length: pairCount }, (_, index) => ({
       functionName: "pairs",
       args: [index],
     }));
 
-    const pairResults: [Pair][] = await multiCall(this.multicall3, this.gnsDiamond, pairCalls);
+    const pairResults: [IPairsStorage.PairStruct][] = await multiCall(this.multicall3, this.gnsDiamond, pairCalls);
 
-    const pairs = pairResults.map((pairResult) => {
-      const pair = pairResult[0];
-      return {
-        from: pair.from,
-        to: pair.to,
-        groupIndex: pair.groupIndex,
-        spreadP: pair.spreadP,
-        feeIndex: pair.feeIndex,
-      };
-    });
+    const pairs = convertTradingPairs(pairResults.map((pair) => pair[0]));
 
+    // groups
     const groupCalls = Array.from({ length: Number(groupsCount) }, (_, index) => ({
       functionName: "groups",
       args: [index],
@@ -80,46 +84,24 @@ export class SDK {
 
     const groupsResults = await multiCall(this.multicall3, this.gnsDiamond, groupCalls);
 
-    const groups = groupsResults.map((groupResult) => {
-      const group = groupResult[0];
-      return {
-        name: group.name,
-        minLeverage: group.minLeverage,
-        maxLeverage: group.maxLeverage,
-      };
-    });
+    const groups = convertTradingGroups(groupsResults.map((group) => group[0]));
 
+    // fees
     const feesCalls = Array.from({ length: Number(feesCount) }, (_, index) => ({
       functionName: "fees",
       args: [index],
     }));
 
     const feesResults = await multiCall(this.multicall3, this.gnsDiamond, feesCalls);
+    const fees = convertFees(feesResults.map((fee) => fee[0]));
 
-    const fees = feesResults.map((feeResult) => {
-      const fee = feeResult[0];
-      return {
-        openFeeP: fee.openFeeP,
-        closeFeeP: fee.closeFeeP,
-        oracleFeeP: fee.oracleFeeP,
-        triggerOrderFeeP: fee.triggerOrderFeeP,
-        minPositionSizeUsd: fee.minPositionSizeUsd,
-      };
-    });
-
+    // feeTiers
     const feeTiersCalls = Array.from({ length: Number(feeTiersCount) }, (_, index) => ({
       functionName: "getFeeTier",
       args: [index],
     }));
 
     const feeTiersResults = await multiCall(this.multicall3, this.gnsDiamond, feeTiersCalls);
-    const feeTiers = feeTiersResults.map((feeTierResult) => {
-      const feeTier = feeTierResult[0];
-      return {
-        feeMultiplier: feeTier.feeMultiplier,
-        pointsThreshold: feeTier.pointsThreshold,
-      };
-    });
 
     const feeMultipliersCalls = Array.from({ length: Number(groupsCount) }, (_, index) => ({
       functionName: "getGroupVolumeMultiplier",
@@ -127,8 +109,13 @@ export class SDK {
     }));
 
     const feeMultipliersResults = await multiCall(this.multicall3, this.gnsDiamond, feeMultipliersCalls);
-    const feeMultipliers = feeMultipliersResults.map((feeMultiplierResult) => feeMultiplierResult[0]);
 
+    const feeTiers = convertFeeTiers({
+      tiers: feeTiersResults.map((feeTier) => feeTier[0]),
+      multipliers: feeMultipliersResults.map((feeMultiplier) => feeMultiplier[0]),
+    });
+
+    // pair borrowing fees
     const pairBorrowingFeesCalls = collaterals.map(({ collateral }, index) => {
       return {
         functionName: "getAllBorrowingPairs",
@@ -137,11 +124,35 @@ export class SDK {
     });
 
     const pairBorrowingFees = await multiCall(this.multicall3, this.gnsDiamond, pairBorrowingFeesCalls);
+    const pairBorrowingFeesConverted = collaterals.map(({ collateral }, index) => {
+      const borrowingDataArr: IBorrowingFees.BorrowingDataStruct[] = pairBorrowingFees[index][0];
+      const borrowingOiArr: IBorrowingFees.OpenInterestStruct[] = pairBorrowingFees[index][1];
+      const borrowingPairGroups: [IBorrowingFees.BorrowingPairGroupStruct[]] = pairBorrowingFees[index][2];
+      return borrowingDataArr.map((borrowingData, pairIndex) => {
+        const pairGroups = borrowingPairGroups[pairIndex];
+        return convertPairBorrowingFee({
+          accFeeLong: borrowingData.accFeeLong,
+          accFeeShort: borrowingData.accFeeShort,
+          accLastUpdatedBlock: borrowingData.accLastUpdatedBlock,
+          feeExponent: borrowingData.feeExponent,
+          feePerBlock: borrowingData.feePerBlock,
+          oi: {
+            long: borrowingOiArr[pairIndex].long,
+            short: borrowingOiArr[pairIndex].short,
+            max: borrowingOiArr[pairIndex].max,
+          },
+          groups: pairGroups?.length ? pairGroups : [],
+        });
+      });
+    });
 
+    // group borrowing fees
     const groupBorrowingFeesCalls = collaterals.map(({ collateral }, index) => {
       const pairBorrowingResult = pairBorrowingFees[index];
       const borrowingFeesGroupIds = [
-        ...new Set<bigint>(pairBorrowingResult[2].map((pair: Pair[]) => pair.map((pair) => pair.groupIndex)).flat()),
+        ...new Set<bigint>(
+          pairBorrowingResult[2].map((pair: IPairsStorage.PairStruct[]) => pair.map((pair) => pair.groupIndex)).flat()
+        ),
       ].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
       return {
         functionName: "getBorrowingGroups",
@@ -153,6 +164,26 @@ export class SDK {
     });
 
     const groupBorrowingFees = await multiCall(this.multicall3, this.gnsDiamond, groupBorrowingFeesCalls);
+    const groupBorrowingFeesConverted = collaterals.map(({ collateral }, index) => {
+      const borrowingDataArr: IBorrowingFees.BorrowingDataStruct[] = groupBorrowingFees[index][0];
+      const borrowingOiArr: IBorrowingFees.OpenInterestStruct[] = groupBorrowingFees[index][1];
+      return borrowingDataArr.map((borrowingData, groupIndex) => {
+        return convertGroupBorrowingFee({
+          accFeeLong: borrowingData.accFeeLong,
+          accFeeShort: borrowingData.accFeeShort,
+          accLastUpdatedBlock: borrowingData.accLastUpdatedBlock,
+          feeExponent: borrowingData.feeExponent,
+          feePerBlock: borrowingData.feePerBlock,
+          oi: {
+            long: borrowingOiArr[groupIndex].long,
+            short: borrowingOiArr[groupIndex].short,
+            max: borrowingOiArr[groupIndex].max,
+          },
+        });
+      });
+    });
+
+    // collateral configs
     const tokenDecimals = await Promise.all([
       ...collaterals.map(({ collateral }) => {
         const token = new Contract(collateral, ERC20_ABI, getProvider(this.chainId));
@@ -176,112 +207,20 @@ export class SDK {
       groups,
       pairs,
       fees,
-      maxPairLeverages,
-      groupBorrowingFees,
-      pairBorrowingFees,
+      maxPairLeverages: maxPairLeverages.map((maxLev) => Number(maxLev)),
+      groupBorrowingFees: groupBorrowingFeesConverted,
+      pairBorrowingFees: pairBorrowingFeesConverted,
       maxGainP: 900,
-      feeTiers: {
-        multipliers: feeMultipliers,
-        tiers: feeTiers,
-      },
+      feeTiers,
     };
   }
 
-  public async getState(): Promise<any> {
+  public async getState(): Promise<State> {
     return this.state;
   }
 
-  public async getMarkets(): Promise<Market[]> {
-    const { collaterals, groups, pairs, maxPairLeverages, pairBorrowingFees, groupBorrowingFees } = this.state;
-
-    const markets: Market[] = pairs.map((pair, pairIndex) => {
-      const maxLeverage =
-        maxPairLeverages[pairIndex] === BigInt(0)
-          ? groups[Number(pair.groupIndex)].maxLeverage
-          : maxPairLeverages[pairIndex];
-      const minLeverage = groups[Number(pair.groupIndex)].minLeverage;
-
-      return {
-        from: pair.from,
-        to: pair.to,
-        groupIndex: pair.groupIndex,
-        index: pairIndex,
-        pairBorrowingFees: collaterals.map(({ collateral }, collateralIndex) => {
-          const { feePerBlock, accFeeLong, accFeeShort, accLastUpdatedBlock, feeExponent } =
-            pairBorrowingFees[collateralIndex][0][pairIndex];
-          const {
-            groupIndex,
-            block,
-            initialAccFeeLong,
-            initialAccFeeShort,
-            prevGroupAccFeeLong,
-            prevGroupAccFeeShort,
-            pairAccFeeLong,
-            pairAccFeeShort,
-          } = pairBorrowingFees[collateralIndex][2][pairIndex][0];
-          return {
-            feePerBlock,
-            accFeeLong,
-            accFeeShort,
-            accLastUpdatedBlock,
-            feeExponent,
-            group: {
-              groupIndex,
-              block,
-              initialAccFeeLong,
-              initialAccFeeShort,
-              prevGroupAccFeeLong,
-              prevGroupAccFeeShort,
-              pairAccFeeLong,
-              pairAccFeeShort,
-            },
-          };
-        }),
-        groupBorrowingFees: collaterals.map(({ collateral }, collateralIndex) => {
-          return groupBorrowingFees[collateralIndex][0].map((groupBorrowingFees) => {
-            const { accFeeLong, accFeeShort, accLastUpdatedBlock, feeExponent, feePerBlock } = groupBorrowingFees;
-            return {
-              accFeeLong,
-              accFeeShort,
-              accLastUpdatedBlock,
-              feeExponent,
-              feePerBlock,
-            };
-          });
-        }),
-        openInterests: collaterals.map(({ collateral }, collateralIndex) => {
-          const { long, short, max } = pairBorrowingFees[collateralIndex][1][pairIndex];
-          const { groupIndex } = pairBorrowingFees[collateralIndex][2][pairIndex][0];
-          const {
-            long: groupLong,
-            short: groupShort,
-            max: groupMax,
-          } = groupBorrowingFees[collateralIndex][1][Number(groupIndex)];
-          return {
-            pair: {
-              long,
-              short,
-              max,
-            },
-            group: {
-              long: groupLong,
-              short: groupShort,
-              max: groupMax,
-            },
-          };
-        }),
-        spreadP: pair.spreadP,
-        feeIndex: pair.feeIndex,
-        minLeverage: minLeverage,
-        maxLeverage: maxLeverage,
-        isActive: Number(maxLeverage) > 1,
-      };
-    });
-    return markets;
-  }
-
-  public async getPositions(account: string): Promise<Position[]> {
-    const { maxPairLeverages, groups } = this.state;
+  public async getUserTrades(account: string): Promise<TradeContainer[]> {
+    const { collaterals } = this.state;
     const [trades, tradeInfos, liquidationParams] = await Promise.all([
       this.gnsDiamond.getTrades(account),
       this.gnsDiamond.getTradeInfos(account),
@@ -310,76 +249,16 @@ export class SDK {
       };
     });
 
-    const userTrades = trades.map((trade, index) => {
+    return trades.map((trade, index) => {
       const tradeInfo = tradeInfos[index];
       const liqParams = liquidationParams[index];
       const initialAccFee = initialAccFees[index];
-      return {
-        trade: {
-          user: trade.user,
-          index: trade.index,
-          pairIndex: trade.pairIndex,
-          leverage: trade.leverage,
-          long: trade.long,
-          isOpen: trade.isOpen,
-          collateralIndex: trade.collateralIndex,
-          tradeType: trade.tradeType,
-          collateralAmount: trade.collateralAmount,
-          openPrice: trade.openPrice,
-          tp: trade.tp,
-          sl: trade.sl,
-        },
-        tradeInfo: {
-          createdBlock: tradeInfo.createdBlock,
-          tpLastUpdatedBlock: tradeInfo.tpLastUpdatedBlock,
-          slLastUpdatedBlock: tradeInfo.slLastUpdatedBlock,
-          maxSlippageP: tradeInfo.maxSlippageP,
-          lastOiUpdateTs: tradeInfo.lastOiUpdateTs,
-          collateralPriceUsd: tradeInfo.collateralPriceUsd,
-          contractsVersion: tradeInfo.contractsVersion,
-          lastPosIncreaseBlock: tradeInfo.lastPosIncreaseBlock,
-        },
-        liquidationParams: {
-          maxLiqSpreadP: liqParams.maxLiqSpreadP,
-          startLiqThresholdP: liqParams.startLiqThresholdP,
-          endLiqThresholdP: liqParams.endLiqThresholdP,
-          startLeverage: liqParams.startLeverage,
-          endLeverage: liqParams.endLeverage,
-        },
+      return convertTradeContainer({
+        trade,
+        tradeInfo,
+        liquidationParams: liqParams,
         initialAccFees: initialAccFee,
-      };
-    });
-
-    return userTrades.map((tradeContainer) => {
-      const { trade, tradeInfo } = tradeContainer;
-      const posSize = trade.collateralAmount * trade.leverage;
-      const posSizeInToken = (posSize * tradeInfo.collateralPriceUsd) / trade.openPrice;
-      const pairIndexNum = Number(trade.pairIndex);
-      const groupIndexNum = Number(this.state.pairs[pairIndexNum]?.groupIndex || 0);
-      return {
-        user: trade.user,
-        pairIndex: pairIndexNum,
-        index: trade.index,
-        long: trade.long,
-        openPrice: trade.openPrice,
-        positionSize: posSize,
-        positionSizeInToken: posSizeInToken,
-        borrowingFee: 0n, // @calc
-        closingFee: 0n, // @calc
-        liquidationPrice: 0n, // @calc
-        leverage: trade.leverage,
-        pnl: {
-          // @calc
-          netPnl: 0n,
-          netPnlP: 0n,
-          uPnL: 0n,
-          uPnLP: 0n,
-        },
-        maxLeverage:
-          maxPairLeverages[pairIndexNum] === BigInt(0)
-            ? groups[Number(groupIndexNum)].maxLeverage
-            : maxPairLeverages[pairIndexNum],
-      };
+      }, collaterals);
     });
   }
 
@@ -465,10 +344,6 @@ export class SDK {
       outboundPoints: expiringTraderDailyInfo.points,
       expiredPoints: expiredDaysInfo.map((dayInfo) => dayInfo.points),
     };
-  }
-
-  public async getPositionsHistory(account: string): Promise<Position[]> {
-    return [];
   }
 
   get build() {
