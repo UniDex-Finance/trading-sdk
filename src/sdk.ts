@@ -3,7 +3,7 @@ import { GNS_DIAMOND_ADDRESSES, MULTICALL3_ADDRESS, SupportedChainId } from "./c
 import { multiCall } from "./utils/multicallHelper";
 import { getCurrentDay, pairs as pairsSdk, TradeContainer, TraderFeeTiers } from "@gainsnetwork/sdk";
 import { GNSDiamond, GNSDiamond__factory, Multicall3__factory } from "./types/contracts";
-import { Contract, ethers } from "ethers";
+import { BigNumberish, Contract, ethers } from "ethers";
 import { State } from "./types";
 import ERC20_ABI from "./abi/ERC20.json";
 import { ModifyPositionTxType, ModifyPositionTxArgs, OpenTradeTxArgs, CloseTradeMarketTxArgs } from "./types/tx";
@@ -65,58 +65,33 @@ export class SDK {
       this.gnsDiamond.getFeeTiersCount(),
     ]);
 
-    // pairs
-    const pairCount = Object.keys(pairsSdk).length;
+    const pairCount = 2; // Object.keys(pairsSdk).length;
 
     const pairCalls = Array.from({ length: pairCount }, (_, index) => ({
       functionName: "pairs",
       args: [index],
     }));
 
-    const pairResults: [IPairsStorage.PairStruct][] = await multiCall(this.multicall3, this.gnsDiamond, pairCalls);
-
-    const pairs = convertTradingPairs(pairResults.map((pair) => pair[0]));
-
-    // groups
     const groupCalls = Array.from({ length: Number(groupsCount) }, (_, index) => ({
       functionName: "groups",
       args: [index],
     }));
 
-    const groupsResults = await multiCall(this.multicall3, this.gnsDiamond, groupCalls);
-
-    const groups = convertTradingGroups(groupsResults.map((group) => group[0]));
-
-    // fees
     const feesCalls = Array.from({ length: Number(feesCount) }, (_, index) => ({
       functionName: "fees",
       args: [index],
     }));
 
-    const feesResults = await multiCall(this.multicall3, this.gnsDiamond, feesCalls);
-    const fees = convertFees(feesResults.map((fee) => fee[0]));
-
-    // feeTiers
     const feeTiersCalls = Array.from({ length: Number(feeTiersCount) }, (_, index) => ({
       functionName: "getFeeTier",
       args: [index],
     }));
-
-    const feeTiersResults = await multiCall(this.multicall3, this.gnsDiamond, feeTiersCalls);
 
     const feeMultipliersCalls = Array.from({ length: Number(groupsCount) }, (_, index) => ({
       functionName: "getGroupVolumeMultiplier",
       args: [index],
     }));
 
-    const feeMultipliersResults = await multiCall(this.multicall3, this.gnsDiamond, feeMultipliersCalls);
-
-    const feeTiers = convertFeeTiers({
-      tiers: feeTiersResults.map((feeTier) => feeTier[0]),
-      multipliers: feeMultipliersResults.map((feeMultiplier) => feeMultiplier[0]),
-    });
-
-    // pair borrowing fees
     const pairBorrowingFeesCalls = collaterals.map(({ collateral }, index) => {
       return {
         functionName: "getAllBorrowingPairs",
@@ -124,11 +99,39 @@ export class SDK {
       };
     });
 
-    const pairBorrowingFees = await multiCall(this.multicall3, this.gnsDiamond, pairBorrowingFeesCalls);
-    const pairBorrowingFeesConverted = collaterals.map(({ collateral }, index) => {
-      const borrowingDataArr: IBorrowingFees.BorrowingDataStruct[] = pairBorrowingFees[index][0];
-      const borrowingOiArr: IBorrowingFees.OpenInterestStruct[] = pairBorrowingFees[index][1];
-      const borrowingPairGroups: [IBorrowingFees.BorrowingPairGroupStruct[]] = pairBorrowingFees[index][2];
+    const [pairResults, groupsResults, feesResults, feeTiersResults, feeMultipliersResults, pairBorrowingFeesResults] =
+      (await Promise.all([
+        multiCall(this.multicall3, this.gnsDiamond, pairCalls),
+        multiCall(this.multicall3, this.gnsDiamond, groupCalls),
+        multiCall(this.multicall3, this.gnsDiamond, feesCalls),
+        multiCall(this.multicall3, this.gnsDiamond, feeTiersCalls),
+        multiCall(this.multicall3, this.gnsDiamond, feeMultipliersCalls),
+        multiCall(this.multicall3, this.gnsDiamond, pairBorrowingFeesCalls),
+      ])) as [
+        [IPairsStorage.PairStruct][],
+        [IPairsStorage.GroupStruct][],
+        [IPairsStorage.FeeStruct][],
+        [IFeeTiers.FeeTierStruct][],
+        BigNumberish[],
+        [
+          IBorrowingFees.BorrowingDataStruct[],
+          IBorrowingFees.OpenInterestStruct[],
+          [IBorrowingFees.BorrowingPairGroupStruct[]]
+        ][]
+      ];
+
+    const pairs = convertTradingPairs(pairResults.map((pair) => pair[0]));
+    const groups = convertTradingGroups(groupsResults.map((group) => group[0]));
+    const fees = convertFees(feesResults.map((fee) => fee[0]));
+    const feeTiers = convertFeeTiers({
+      tiers: feeTiersResults.map((feeTier) => feeTier[0]),
+      multipliers: feeMultipliersResults.map((feeMultiplier) => feeMultiplier[0]),
+    });
+
+    const pairBorrowingFees = collaterals.map(({ collateral }, index) => {
+      const borrowingDataArr = pairBorrowingFeesResults[index][0];
+      const borrowingOiArr = pairBorrowingFeesResults[index][1];
+      const borrowingPairGroups = pairBorrowingFeesResults[index][2];
       return borrowingDataArr.map((borrowingData, pairIndex) => {
         const pairGroups = borrowingPairGroups[pairIndex];
         return convertPairBorrowingFee({
@@ -145,11 +148,9 @@ export class SDK {
 
     // group borrowing fees
     const groupBorrowingFeesCalls = collaterals.map(({ collateral }, index) => {
-      const pairBorrowingResult = pairBorrowingFees[index];
+      const pairBorrowingResult = pairBorrowingFeesResults[index];
       const borrowingFeesGroupIds = [
-        ...new Set<bigint>(
-          pairBorrowingResult[2].map((pair: IPairsStorage.PairStruct[]) => pair.map((pair) => pair.groupIndex)).flat()
-        ),
+        ...new Set<BigNumberish>(pairBorrowingResult[2].map((pair) => pair.map((pair) => pair.groupIndex)).flat()),
       ].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
       return {
         functionName: "getBorrowingGroups",
@@ -160,10 +161,10 @@ export class SDK {
       };
     });
 
-    const groupBorrowingFees = await multiCall(this.multicall3, this.gnsDiamond, groupBorrowingFeesCalls);
-    const groupBorrowingFeesConverted = collaterals.map(({ collateral }, index) => {
-      const borrowingDataArr: IBorrowingFees.BorrowingDataStruct[] = groupBorrowingFees[index][0];
-      const borrowingOiArr: IBorrowingFees.OpenInterestStruct[] = groupBorrowingFees[index][1];
+    const groupBorrowingFeesResults = await multiCall(this.multicall3, this.gnsDiamond, groupBorrowingFeesCalls);
+    const groupBorrowingFees = collaterals.map(({ collateral }, index) => {
+      const borrowingDataArr: IBorrowingFees.BorrowingDataStruct[] = groupBorrowingFeesResults[index][0];
+      const borrowingOiArr: IBorrowingFees.OpenInterestStruct[] = groupBorrowingFeesResults[index][1];
       return borrowingDataArr.map((borrowingData, groupIndex) => {
         return convertGroupBorrowingFee({
           accFeeLong: borrowingData.accFeeLong,
@@ -201,8 +202,8 @@ export class SDK {
       pairs,
       fees,
       maxPairLeverages: maxPairLeverages.map((maxLev) => Number(maxLev)),
-      groupBorrowingFees: groupBorrowingFeesConverted,
-      pairBorrowingFees: pairBorrowingFeesConverted,
+      groupBorrowingFees,
+      pairBorrowingFees,
       maxGainP: 900,
       feeTiers,
     };
