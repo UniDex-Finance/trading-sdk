@@ -1,7 +1,7 @@
 import { getProvider } from "./utils/provider";
 import { GNS_DIAMOND_ADDRESSES, MULTICALL3_ADDRESS, SupportedChainId } from "./config/constants";
 import { multiCall } from "./utils/multicallHelper";
-import { getCurrentDay, pairs as pairsSdk, TradeContainer } from "@gainsnetwork/sdk";
+import { getCurrentDay, pairs as pairsSdk, TradeContainer, TraderFeeTiers } from "@gainsnetwork/sdk";
 import { GNSDiamond, GNSDiamond__factory, Multicall3__factory } from "./types/contracts";
 import { Contract, ethers } from "ethers";
 import { State } from "./types";
@@ -26,6 +26,7 @@ import {
   convertGroupBorrowingFee,
   convertPairBorrowingFee,
   convertTradeContainer,
+  convertTraderFeeTiers,
   convertTradingGroups,
   convertTradingPairs,
 } from "./utils/dataConverter";
@@ -253,16 +254,19 @@ export class SDK {
       const tradeInfo = tradeInfos[index];
       const liqParams = liquidationParams[index];
       const initialAccFee = initialAccFees[index];
-      return convertTradeContainer({
-        trade,
-        tradeInfo,
-        liquidationParams: liqParams,
-        initialAccFees: initialAccFee,
-      }, collaterals);
+      return convertTradeContainer(
+        {
+          trade,
+          tradeInfo,
+          liquidationParams: liqParams,
+          initialAccFees: initialAccFee,
+        },
+        collaterals
+      );
     });
   }
 
-  public async getTraderFeeTiers(account: string): Promise<any> {
+  public async getTraderFeeTiers(account: string): Promise<TraderFeeTiers> {
     const currentDay = getCurrentDay();
     const expiringDay = currentDay - 30;
     const [
@@ -333,17 +337,15 @@ export class SDK {
     });
     const expiredDaysInfo = daysInfo.slice(0, -1);
     const lastDayUpdatedInfo = daysInfo[daysInfo.length - 1];
-    return {
-      traderInfo: {
-        lastDayUpdated: traderInfo.lastDayUpdated,
-        trailingPoints: traderInfo.trailingPoints,
-      },
+
+    return convertTraderFeeTiers({
+      traderInfo,
       traderEnrollment: { status: traderEnrollmentStatus },
       lastDayUpdatedPoints: lastDayUpdatedInfo.points,
       inboundPoints: currentTraderDailyInfo.points,
       outboundPoints: expiringTraderDailyInfo.points,
       expiredPoints: expiredDaysInfo.map((dayInfo) => dayInfo.points),
-    };
+    });
   }
 
   get build() {

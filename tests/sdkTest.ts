@@ -22,7 +22,7 @@ async function runTest() {
     // getTraderFeeTiers()
     // const response = await sdk.getTraderFeeTiers(USER_ADDRESS);
 
-    console.log("[test] 1", response);
+    console.log("[test] Sdk response", response);
   } catch (error) {
     console.error("Error:", error);
   }

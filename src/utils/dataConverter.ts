@@ -277,7 +277,7 @@ export const convertFeeTiers = (feeTiers: {
 });
 
 export const convertTraderFeeTiers = (traderFeeTiers: {
-  traderEnrollment: IFeeTiers.TraderEnrollmentStruct;
+  traderEnrollment: Omit<IFeeTiers.TraderEnrollmentStruct, "__placeholder">;
   traderInfo: IFeeTiers.TraderInfoStruct;
   lastDayUpdatedPoints: IFeeTiers.TraderDailyInfoStruct;
   inboundPoints: BigNumberish;
