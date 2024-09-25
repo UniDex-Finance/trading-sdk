@@ -1,7 +1,7 @@
 import { ethers } from "ethers";
 import { SupportedChainId } from "../config/constants";
 
-export const getProvider = (chainId: SupportedChainId) => {
+export const getDefaultProvider = (chainId: SupportedChainId) => {
   if (chainId === SupportedChainId.Arbitrum) {
     return new ethers.JsonRpcProvider("https://arbitrum.llamarpc.com");
   }

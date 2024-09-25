@@ -1,4 +1,4 @@
-import { getProvider } from "./utils/provider";
+import { getDefaultProvider } from "./utils/defaultProvider";
 import { GNS_DIAMOND_ADDRESSES, MULTICALL3_ADDRESS, SupportedChainId } from "./config/constants";
 import { multiCall } from "./utils/multicallHelper";
 import { getCurrentDay, pairs as pairsSdk, TradeContainer, TraderFeeTiers } from "@gainsnetwork/sdk";
@@ -35,20 +35,20 @@ import { IBorrowingFees, IFeeTiers, IPairsStorage } from "./types/contracts/GNSD
 export class SDK {
   private chainId: SupportedChainId;
   private signer?: ethers.Signer;
+  private runner: ethers.JsonRpcProvider | ethers.Signer;
   private gnsDiamond: GNSDiamond;
   private multicall3: Contract;
   private state: State = {} as State;
   public lastRefreshedTs: number = Date.now();
   public initialized: boolean = false;
 
-  constructor(chainId: SupportedChainId, signer?: ethers.Signer) {
+  constructor(chainId: SupportedChainId, signer?: ethers.Signer, rpcProvider?: ethers.JsonRpcProvider) {
     this.chainId = chainId;
     this.signer = signer;
+    this.runner = this.signer ?? rpcProvider ?? getDefaultProvider(chainId);
 
-    const runner = this.signer ?? getProvider(chainId);
-
-    this.gnsDiamond = GNSDiamond__factory.connect(GNS_DIAMOND_ADDRESSES[chainId], runner);
-    this.multicall3 = new ethers.Contract(MULTICALL3_ADDRESS, Multicall3__factory.abi, runner);
+    this.gnsDiamond = GNSDiamond__factory.connect(GNS_DIAMOND_ADDRESSES[chainId], this.runner);
+    this.multicall3 = new ethers.Contract(MULTICALL3_ADDRESS, Multicall3__factory.abi, this.runner);
   }
 
   public async initialize() {
@@ -180,7 +180,7 @@ export class SDK {
     // collateral configs
     const tokenDecimals = await Promise.all([
       ...collaterals.map(({ collateral }) => {
-        const token = new Contract(collateral, ERC20_ABI, getProvider(this.chainId));
+        const token = new Contract(collateral, ERC20_ABI, this.runner);
         return token.decimals() as Promise<bigint>;
       }),
     ]);
