@@ -19,18 +19,20 @@ const userTrades = await tradingSdk.getUserTrades("USER_ADDRESS");
 
 ## Adapters
 
-Use adapters when working with supported integrations.
+Use adapters when working with supported integrations:
 
 ```typescript
 // import and initialize
-import { getMarkets } from "@gainsnetwork/trading-sdk/adapters/kwenta";
+import { getMarkets, getPositions } from "@gainsnetwork/trading-sdk/adapters/kwenta";
 import { TradingSDK } from "@gainsnetwork/trading-sdk";
 const tradingSdk = new TradingSDK(SupportedChainId.ArbitrumSepolia);
 await tradingSdk.initialize();
 
 // use tradingSdk methods
 const state = await tradingSdk.getState();
+const userTrades = await tradingSdk.getUserTrades("USER_ADDRESS");
 
-// use adapter to get integration ready data structure
+// use adapter to get integration-ready data
 const markets = getMarkets(state);
+const positions = getPositions(state, userTrades);
 ```
