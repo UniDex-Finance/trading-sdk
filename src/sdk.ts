@@ -65,7 +65,7 @@ export class SDK {
       this.gnsDiamond.getFeeTiersCount(),
     ]);
 
-    const pairCount = 2; // Object.keys(pairsSdk).length;
+    const pairCount = Object.keys(pairsSdk).length;
 
     const pairCalls = Array.from({ length: pairCount }, (_, index) => ({
       functionName: "pairs",
