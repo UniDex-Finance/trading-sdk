@@ -121,7 +121,7 @@ export const getMarket = (state: State, pair: Pair, pairIndex: number) => {
     feeRates: fees[pair.feeIndex],
     minLeverage: minLeverage,
     maxLeverage: maxLeverage,
-    isSuspended: Number(maxLeverage) > 1,
+    isSuspended: Number(maxLeverage) < 1,
   };
 };
 
