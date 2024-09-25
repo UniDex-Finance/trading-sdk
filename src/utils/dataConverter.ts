@@ -28,10 +28,10 @@ export const convertTradesAndLimitOrders = (
   allItems: {
     trade: ITradingStorage.TradeStruct;
     tradeInfo: ITradingStorage.TradeInfoStruct;
-    initialAccFees: Omit<IBorrowingFees.BorrowingInitialAccFeesStruct, "__placeholder">;
+    initialAccFees: IBorrowingFees.BorrowingInitialAccFeesStruct;
     liquidationParams: IPairsStorage.GroupLiquidationParamsStruct;
   }[],
-  collaterals: (Omit<ITradingStorage.CollateralStruct, "__placeholder"> & { decimals?: BigNumberish })[]
+  collaterals: CollateralConfig[]
 ) =>
   allItems?.map((item) => {
     return convertTradeContainer(item, collaterals);
@@ -41,10 +41,10 @@ export const convertTradeContainer = (
   tradeContainer: {
     trade: ITradingStorage.TradeStruct;
     tradeInfo: ITradingStorage.TradeInfoStruct;
-    initialAccFees: Omit<IBorrowingFees.BorrowingInitialAccFeesStruct, "__placeholder">;
+    initialAccFees: IBorrowingFees.BorrowingInitialAccFeesStruct;
     liquidationParams: IPairsStorage.GroupLiquidationParamsStruct;
   },
-  collaterals: (Omit<ITradingStorage.CollateralStruct, "__placeholder"> & { decimals?: BigNumberish })[]
+  collaterals: CollateralConfig[]
 ): TradeContainer => ({
   trade: convertTrade(tradeContainer.trade, collaterals),
   tradeInfo: convertTradeInfo(tradeContainer.tradeInfo),
@@ -88,7 +88,7 @@ export const convertPairFactor = (pairFactor: IPriceImpact.PairFactorsStruct): P
 
 export const convertTrade = (
   trade: ITradingStorage.TradeStruct,
-  collaterals: (Omit<ITradingStorage.CollateralStruct, "__placeholder"> & { decimals?: BigNumberish })[]
+  collaterals: CollateralConfig[]
 ): Trade => {
   const { long, user } = trade;
   const collateralIndex = Number(trade.collateralIndex);
@@ -123,7 +123,7 @@ export const convertTradeInfo = (tradeInfo: ITradingStorage.TradeInfoStruct): Tr
 });
 
 export const convertTradeInitialAccFees = (
-  initialAccFees: Omit<IBorrowingFees.BorrowingInitialAccFeesStruct, "__placeholder">
+  initialAccFees: IBorrowingFees.BorrowingInitialAccFeesStruct
 ): TradeInitialAccFees => ({
   accPairFee: Number(initialAccFees.accPairFee || "0") / 1e10,
   accGroupFee: Number(initialAccFees.accGroupFee || "0") / 1e10,
@@ -199,7 +199,7 @@ export const convertPairGroupBorrowingFee = (
 });
 
 export const convertPairBorrowingFee = (
-  pairParams: IBorrowingFees.BorrowingDataStruct & { oi: Omit<IBorrowingFees.OpenInterestStruct, "__placeholder"> } & {
+  pairParams: IBorrowingFees.BorrowingDataStruct & { oi: IBorrowingFees.OpenInterestStruct } & {
     groups: IBorrowingFees.BorrowingPairGroupStruct[];
   }
 ): BorrowingFee.Pair => ({
@@ -221,7 +221,8 @@ export const convertGroupBorrowingFees = (pairParams: {
 }): BorrowingFee.Group[] => pairParams?.groups.map((pairParam) => convertGroupBorrowingFee(pairParam));
 
 export const convertGroupBorrowingFee = (
-  pairParams: IBorrowingFees.BorrowingDataStruct & { oi: Omit<IBorrowingFees.OpenInterestStruct, "__placeholder"> }
+  pairParams: IBorrowingFees.BorrowingDataStruct & { oi: 
+    IBorrowingFees.OpenInterestStruct }
 ): BorrowingFee.Group => ({
   oi: {
     long: Number(pairParams.oi.long) / 1e10,
@@ -277,7 +278,7 @@ export const convertFeeTiers = (feeTiers: {
 });
 
 export const convertTraderFeeTiers = (traderFeeTiers: {
-  traderEnrollment: Omit<IFeeTiers.TraderEnrollmentStruct, "__placeholder">;
+  traderEnrollment: IFeeTiers.TraderEnrollmentStruct;
   traderInfo: IFeeTiers.TraderInfoStruct;
   lastDayUpdatedPoints: IFeeTiers.TraderDailyInfoStruct;
   inboundPoints: BigNumberish;

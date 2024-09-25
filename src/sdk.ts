@@ -66,7 +66,7 @@ export class SDK {
     ]);
 
     // pairs
-    const pairCount = false ? 5 : Object.keys(pairsSdk).length; // @kuko todo: remove 5 to get all markets
+    const pairCount = Object.keys(pairsSdk).length;
 
     const pairCalls = Array.from({ length: pairCount }, (_, index) => ({
       functionName: "pairs",
@@ -137,11 +137,7 @@ export class SDK {
           accLastUpdatedBlock: borrowingData.accLastUpdatedBlock,
           feeExponent: borrowingData.feeExponent,
           feePerBlock: borrowingData.feePerBlock,
-          oi: {
-            long: borrowingOiArr[pairIndex].long,
-            short: borrowingOiArr[pairIndex].short,
-            max: borrowingOiArr[pairIndex].max,
-          },
+          oi: borrowingOiArr[pairIndex],
           groups: pairGroups?.length ? pairGroups : [],
         });
       });
@@ -175,11 +171,7 @@ export class SDK {
           accLastUpdatedBlock: borrowingData.accLastUpdatedBlock,
           feeExponent: borrowingData.feeExponent,
           feePerBlock: borrowingData.feePerBlock,
-          oi: {
-            long: borrowingOiArr[groupIndex].long,
-            short: borrowingOiArr[groupIndex].short,
-            max: borrowingOiArr[groupIndex].max,
-          },
+          oi: borrowingOiArr[groupIndex],
         });
       });
     });
@@ -241,14 +233,9 @@ export class SDK {
         };
       });
     const initialAccFeesResults = await multiCall(this.multicall3, this.gnsDiamond, initialAccFeesCalls);
-    const initialAccFees = initialAccFeesResults.map((initialAccFeesResult) => {
-      const initialAccFee = initialAccFeesResult[0];
-      return {
-        accPairFee: initialAccFee.accPairFee,
-        accGroupFee: initialAccFee.accGroupFee,
-        block: initialAccFee.block,
-      };
-    });
+    const initialAccFees: IBorrowingFees.BorrowingInitialAccFeesStruct[] = initialAccFeesResults.map(
+      (result) => result[0]
+    );
 
     return trades.map((trade, index) => {
       const tradeInfo = tradeInfos[index];
@@ -273,7 +260,7 @@ export class SDK {
       { lastDayUpdated: lastDayUpdatedRaw, trailingPoints: trailingPointsRaw },
       { feeMultiplierCache: currentFeeMultiplierCacheRaw, points: currentPointsRaw },
       { feeMultiplierCache: expiringFeeMultiplierCacheRaw, points: expiringPointsRaw },
-      { status: traderEnrollmentStatus },
+      traderEnrollment,
     ] = (
       await multiCall(this.multicall3, this.gnsDiamond, [
         {
@@ -293,7 +280,12 @@ export class SDK {
           args: [account],
         },
       ])
-    ).map((result) => result[0]);
+    ).map((result) => result[0]) as [
+      IFeeTiers.TraderInfoStruct,
+      IFeeTiers.TraderDailyInfoStructOutput,
+      IFeeTiers.TraderDailyInfoStructOutput,
+      IFeeTiers.TraderEnrollmentStructOutput
+    ];
 
     const traderInfo = {
       lastDayUpdated: lastDayUpdatedRaw,
@@ -312,7 +304,7 @@ export class SDK {
 
     const calls: { functionName: string; args: (string | number)[] }[] = [];
 
-    if (traderInfo.lastDayUpdated > BigInt(0)) {
+    if (Number(traderInfo.lastDayUpdated) > Number(0)) {
       const earliestExpiredDay = Math.max(Number(traderInfo.lastDayUpdated) - 30, expiringDay - 30);
 
       for (let day = expiringDay - 1; day >= earliestExpiredDay; day--) {
@@ -324,7 +316,7 @@ export class SDK {
     }
     calls.push({
       functionName: "getFeeTiersTraderDailyInfo",
-      args: [account, traderInfo.lastDayUpdated],
+      args: [account, Number(traderInfo.lastDayUpdated)],
     });
 
     const daysInfoResults = await multiCall(this.multicall3, this.gnsDiamond, calls);
@@ -340,7 +332,7 @@ export class SDK {
 
     return convertTraderFeeTiers({
       traderInfo,
-      traderEnrollment: { status: traderEnrollmentStatus },
+      traderEnrollment,
       lastDayUpdatedPoints: lastDayUpdatedInfo.points,
       inboundPoints: currentTraderDailyInfo.points,
       outboundPoints: expiringTraderDailyInfo.points,
