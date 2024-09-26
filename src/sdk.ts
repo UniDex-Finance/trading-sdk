@@ -31,6 +31,7 @@ import {
   convertTradingPairs,
 } from "./utils/dataConverter";
 import { IBorrowingFees, IFeeTiers, IPairsStorage } from "./types/contracts/GNSDiamond";
+import { Backend } from "./services/backend";
 
 export class TradingSDK {
   private chainId: SupportedChainId;
@@ -38,6 +39,7 @@ export class TradingSDK {
   private runner: ethers.JsonRpcProvider | ethers.Signer;
   private gnsDiamond: GNSDiamond;
   private multicall3: Contract;
+  private backend: Backend;
   private state: State = {} as State;
   public lastRefreshedTs: number = Date.now();
   public initialized: boolean = false;
@@ -49,6 +51,7 @@ export class TradingSDK {
 
     this.gnsDiamond = GNSDiamond__factory.connect(GNS_DIAMOND_ADDRESSES[chainId], this.runner);
     this.multicall3 = new ethers.Contract(MULTICALL3_ADDRESS, Multicall3__factory.abi, this.runner);
+    this.backend = new Backend(chainId);
   }
 
   public async initialize() {
@@ -339,6 +342,10 @@ export class TradingSDK {
       outboundPoints: expiringTraderDailyInfo.points,
       expiredPoints: expiredDaysInfo.map((dayInfo) => dayInfo.points),
     });
+  }
+
+  public async getTraderHistory(account: string) {
+    return this.backend.getTraderHistory(account);
   }
 
   get build() {
