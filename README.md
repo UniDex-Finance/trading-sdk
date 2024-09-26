@@ -25,8 +25,8 @@ Use adapters when working with supported integrations:
 
 ```typescript
 // import and initialize
-import { getMarkets, getPositions } from "@gainsnetwork/trading-sdk/adapters/kwenta";
 import { TradingSDK, SupportedChainId } from "@gainsnetwork/trading-sdk";
+import { getMarkets, getPositions } from "@gainsnetwork/trading-sdk/lib/adapters/kwenta";
 const tradingSdk = new TradingSDK(SupportedChainId.ArbitrumSepolia);
 await tradingSdk.initialize();
 
