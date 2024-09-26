@@ -1,3 +1,5 @@
+# Gains Network Trading SDK
+
 ## Install
 
 ```bash
@@ -8,7 +10,7 @@ npm i --save @gainsnetwork/trading-sdk
 
 ```typescript
 // import and initialize
-import { TradingSDK } from "@gainsnetwork/trading-sdk";
+import { TradingSDK, SupportedChainId } from "@gainsnetwork/trading-sdk";
 const tradingSdk = new TradingSDK(SupportedChainId.ArbitrumSepolia);
 await tradingSdk.initialize();
 
@@ -24,7 +26,7 @@ Use adapters when working with supported integrations:
 ```typescript
 // import and initialize
 import { getMarkets, getPositions } from "@gainsnetwork/trading-sdk/adapters/kwenta";
-import { TradingSDK } from "@gainsnetwork/trading-sdk";
+import { TradingSDK, SupportedChainId } from "@gainsnetwork/trading-sdk";
 const tradingSdk = new TradingSDK(SupportedChainId.ArbitrumSepolia);
 await tradingSdk.initialize();
 

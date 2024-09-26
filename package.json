@@ -1,7 +1,7 @@
 {
   "name": "@gainsnetwork/trading-sdk",
-  "version": "0.0.1-rc3",
-  "description": "",
+  "version": "0.0.1-rc4",
+  "description": "Gains Network Trading SDK",
   "main": "./lib/index.js",
   "files": [
     "lib/**/*"

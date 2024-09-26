@@ -44,10 +44,10 @@ export const getMarkets = (state: State): Market[] => {
 };
 
 export const getMarket = (state: State, pair: Pair, pairIndex: number) => {
-  const { collaterals, groups, pairs, maxPairLeverages, pairBorrowingFees, groupBorrowingFees, fees } = state;
+  const { collaterals, groups, maxPairLeverages, pairBorrowingFees, groupBorrowingFees, fees } = state;
   const maxLeverage =
-    maxPairLeverages[pairIndex] === 0 ? groups[Number(pair.groupIndex)].maxLeverage : maxPairLeverages[pairIndex];
-  const minLeverage = groups[Number(pair.groupIndex)].minLeverage;
+    maxPairLeverages[pairIndex] === 0 ? groups[pair.groupIndex].maxLeverage : maxPairLeverages[pairIndex];
+  const minLeverage = groups[pair.groupIndex].minLeverage;
 
   return {
     marketName: `${pair.from}${pair.to}`,
@@ -55,33 +55,14 @@ export const getMarket = (state: State, pair: Pair, pairIndex: number) => {
     marketKey: pairIndex,
     pairBorrowingFees: collaterals.map(({ collateral }, collateralIndex) => {
       const { feePerBlock, accFeeLong, accFeeShort, accLastUpdatedBlock, feeExponent } =
-        pairBorrowingFees[collateralIndex][0][pairIndex];
-      const {
-        groupIndex,
-        block,
-        initialAccFeeLong,
-        initialAccFeeShort,
-        prevGroupAccFeeLong,
-        prevGroupAccFeeShort,
-        pairAccFeeLong,
-        pairAccFeeShort,
-      } = pairBorrowingFees[collateralIndex][2][pairIndex][0];
+        pairBorrowingFees[collateralIndex][pairIndex];
       return {
         feePerBlock,
         accFeeLong,
         accFeeShort,
         accLastUpdatedBlock,
         feeExponent,
-        group: {
-          groupIndex,
-          block,
-          initialAccFeeLong,
-          initialAccFeeShort,
-          prevGroupAccFeeLong,
-          prevGroupAccFeeShort,
-          pairAccFeeLong,
-          pairAccFeeShort,
-        },
+        group: pairBorrowingFees[collateralIndex][pairIndex].groups[0],
       };
     }),
     groupBorrowingFees: collaterals.map(({ collateral }, collateralIndex) => {
@@ -97,31 +78,22 @@ export const getMarket = (state: State, pair: Pair, pairIndex: number) => {
       });
     }),
     openInterests: collaterals.map(({ collateral }, collateralIndex) => {
-      const { long, short, max } = pairBorrowingFees[collateralIndex][1][pairIndex];
-      const { groupIndex } = pairBorrowingFees[collateralIndex][2][pairIndex][0];
-      const {
-        long: groupLong,
-        short: groupShort,
-        max: groupMax,
-      } = groupBorrowingFees[collateralIndex][1][Number(groupIndex)];
+      const { long, short, max } = pairBorrowingFees[collateralIndex][pairIndex].oi;
+      const groupIndex = pairBorrowingFees[collateralIndex][pairIndex].groups[0]?.groupIndex || 0;
       return {
         pair: {
           long,
           short,
           max,
         },
-        group: {
-          long: groupLong,
-          short: groupShort,
-          max: groupMax,
-        },
+        group: groupBorrowingFees[collateralIndex][groupIndex].oi,
       };
     }),
     spreadP: pair.spreadP,
     feeRates: fees[pair.feeIndex],
     minLeverage: minLeverage,
     maxLeverage: maxLeverage,
-    isSuspended: Number(maxLeverage) < 1,
+    isSuspended: maxLeverage < 1,
   };
 };
 
@@ -166,7 +138,7 @@ export const getPosition = (
       netPnlPct: 0,
       pnl: 0,
     },
-    maxLeverage: maxLeverages[pairIndex] === 0 ? groups[Number(groupIndex)].maxLeverage : maxLeverages[pairIndex],
+    maxLeverage: maxLeverages[pairIndex] === 0 ? groups[groupIndex].maxLeverage : maxLeverages[pairIndex],
   };
 };
 

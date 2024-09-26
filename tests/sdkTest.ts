@@ -1,5 +1,6 @@
 import { SupportedChainId } from "../src/config/constants";
 import { TradingSDK } from "../src/sdk";
+import { getMarkets, getPositions } from "../src/adapters";
 
 async function runTest() {
   const tradingSdk = new TradingSDK(SupportedChainId.ArbitrumSepolia);
@@ -11,18 +12,21 @@ async function runTest() {
     await tradingSdk.initialize();
 
     // getState()
-    const response = await tradingSdk.getState();
-
-    // getMarkets()
-    // const response = await tradingSdk.getMarkets();
+    const state = await tradingSdk.getState();
 
     // getUserTrades()
-    // const response = await tradingSdk.getUserTrades(USER_ADDRESS);
+    // const userTrades = await tradingSdk.getUserTrades(USER_ADDRESS);
 
     // getTraderFeeTiers()
     // const response = await tradingSdk.getTraderFeeTiers(USER_ADDRESS);
 
-    console.log("[test] TradingSDK response", response);
+    // getMarkets() via Kwenta adapter
+    // const markets = getMarkets(state);
+
+    // getPositions() via Kwenta adapter
+    // const positions = getPositions(state, userTrades);
+
+    console.log("[test] TradingSDK response", state);
   } catch (error) {
     console.error("Error:", error);
   }
