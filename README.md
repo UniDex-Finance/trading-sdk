@@ -1,7 +1,7 @@
 ## Install
 
 ```bash
-npm install @gainsnetwork/trading-sdk
+npm i --save @gainsnetwork/trading-sdk
 ```
 
 ## Usage
