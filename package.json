@@ -13,7 +13,7 @@
     "sdkTest": "ts-node tests/sdkTest.ts",
     "sdkTest:build": "ts-node tests/buildTx.ts",
     "dev": "nodemon --watch 'src/**' --watch 'tests/**' --ext 'ts,json' --exec 'ts-node tests/sdkTest.ts'",
-    "typecheck": "npm generate-types && tsc --noEmit"
+    "typecheck": "npm run generate-types && tsc --noEmit"
   },
   "author": "",
   "license": "ISC",
