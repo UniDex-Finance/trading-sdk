@@ -32,7 +32,7 @@ import {
 } from "./utils/dataConverter";
 import { IBorrowingFees, IFeeTiers, IPairsStorage } from "./types/contracts/GNSDiamond";
 
-export class SDK {
+export class TradingSDK {
   private chainId: SupportedChainId;
   private signer?: ethers.Signer;
   private runner: ethers.JsonRpcProvider | ethers.Signer;

@@ -1,6 +1,6 @@
 {
   "name": "@gainsnetwork/trading-sdk",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "",
   "main": "./lib/index.js",
   "files": [
@@ -9,7 +9,6 @@
   "scripts": {
     "build": "tsc --project tsconfig.build.json",
     "clean": "rm -rf ./lib/",
-    "postinstall": "npm run generate-types",
     "generate-types": "typechain --target=ethers-v6 'src/abi/*.json' --out-dir src/types/contracts",
     "sdkTest": "ts-node tests/sdkTest.ts",
     "sdkTest:build": "ts-node tests/buildTx.ts",

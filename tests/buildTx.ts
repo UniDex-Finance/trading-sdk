@@ -1,10 +1,10 @@
 import { parseUnits } from "ethers";
 import { SupportedChainId } from "../src/config/constants";
-import { SDK } from "../src/sdk";
+import { TradingSDK } from "../src/sdk";
 import { ModifyPositionTxType, UpdatePositionSizeTxType } from "../src/types/tx";
 
 async function runTest() {
-  const sdk = new SDK(SupportedChainId.ArbitrumSepolia);
+  const tradingSdk = new TradingSDK(SupportedChainId.ArbitrumSepolia);
 
   try {
     {
@@ -17,7 +17,7 @@ async function runTest() {
         expectedPrice: 10.1, // $10.1
       };
       console.log(`\nModify position (increase position size)`);
-      const tx = await sdk.build.modifyPosition(args);
+      const tx = await tradingSdk.build.modifyPosition(args);
       console.log(tx);
     }
 
@@ -32,7 +32,7 @@ async function runTest() {
         updateMaxClosingSlippageP: true,
       };
       console.log(`\nModify position (decrease position size)`);
-      const tx = await sdk.build.modifyPosition(args);
+      const tx = await tradingSdk.build.modifyPosition(args);
       console.log(tx);
     }
 
@@ -43,21 +43,21 @@ async function runTest() {
         maxSlippageP: 1.5,
       };
       console.log(`\ncloseTradeMarket - ${JSON.stringify(args)}`);
-      const tx = await sdk.build.closeTradeMarket(args);
+      const tx = await tradingSdk.build.closeTradeMarket(args);
       console.log(tx);
     }
 
     {
       const index = 1;
       console.log(`\ncancelOpenOrder - index ${index}`);
-      const tx = await sdk.build.cancelOpenOrder(index);
+      const tx = await tradingSdk.build.cancelOpenOrder(index);
       console.log(tx);
     }
 
     {
       const index = 1;
       console.log(`\ncancelOrderAfterTimeout - index ${index}`);
-      const tx = await sdk.build.cancelOrderAfterTimeout(index);
+      const tx = await tradingSdk.build.cancelOrderAfterTimeout(index);
       console.log(tx);
     }
   } catch (error) {
