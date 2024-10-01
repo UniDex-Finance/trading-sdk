@@ -1,11 +1,16 @@
 import { Fee, OpenInterest, Pair, TradeContainer, TradingGroup } from "@gainsnetwork/sdk";
-import { State } from "../types";
+import { State, TradeWithHistory } from "../types";
+
+export enum PositionSide {
+  LONG,
+  SHORT,
+}
 
 export interface Position {
   marketKey: number;
   user: string;
   index: number;
-  side: boolean;
+  side: PositionSide;
   avgEntryPrice: number;
   notionalValue: number;
   size: number;
@@ -37,6 +42,22 @@ export interface Market {
   minLeverage: number;
   maxLeverage: number;
   isSuspended: boolean;
+}
+
+export interface PositionHistory {
+  id: string;
+  openTimestamp: number;
+  closeTimestamp: number | null;
+  marketKey: number;
+  isOpen: boolean;
+  isLiquidated: boolean;
+  size: number;
+  avgEntryPrice: number;
+  exitPrice: number | null;
+  side: PositionSide;
+  pnl: number;
+  totalVolume: number;
+  trades: number;
 }
 
 export const getMarkets = (state: State): Market[] => {
@@ -119,7 +140,7 @@ export const getPosition = (
     user,
     marketKey: pairIndex,
     index,
-    side: long,
+    side: long ? PositionSide.LONG : PositionSide.SHORT,
     avgEntryPrice: openPrice,
     notionalValue: posSize,
     size: posSizeInToken,
@@ -142,4 +163,35 @@ export const getPosition = (
   };
 };
 
-export const getPositionsHistory = () => null; // @todo
+export const getPositionsHistory = (userTrades: TradeWithHistory[]) => {
+  return userTrades.map((tradeWithHistory) => getPositionHistory(tradeWithHistory));
+};
+
+export const getPositionHistory = (tradeWithHistory: TradeWithHistory): PositionHistory => {
+  const { index, user, isOpen, pairIndex, history, openPrice, long, leverage, collateralAmount } = tradeWithHistory;
+  const tradeCloseHistoryEntry = !isOpen && history[history.length - 1];
+  return {
+    id: `${user}-${index}`,
+    openTimestamp: new Date(history[0].date).getTime(),
+    closeTimestamp: tradeCloseHistoryEntry ? new Date(tradeCloseHistoryEntry.date).getTime() : null,
+    marketKey: pairIndex,
+    isOpen: isOpen,
+    isLiquidated: tradeCloseHistoryEntry && tradeCloseHistoryEntry.action === "TradeClosedLIQ",
+    avgEntryPrice: openPrice,
+    exitPrice: tradeCloseHistoryEntry ? tradeCloseHistoryEntry.marketPrice : null,
+    side: long ? PositionSide.LONG : PositionSide.SHORT,
+    pnl: history.reduce((acc, entry) => acc + entry.pnl * entry.collateralPriceUsd, 0),
+    size: leverage * collateralAmount,
+    totalVolume: history
+      .filter((it) => it.action !== "TradeLeverageUpdate")
+      .reduce(
+        (acc, entry) =>
+          acc +
+          (entry.collateralDelta || entry.collateralAmount) *
+            (entry.leverageDelta || entry.leverage) *
+            entry.collateralPriceUsd,
+        0
+      ),
+    trades: history.filter((it) => it.action !== "TradeLeverageUpdate").length,
+  };
+};

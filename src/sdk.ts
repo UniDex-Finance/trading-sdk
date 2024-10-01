@@ -353,7 +353,7 @@ export class TradingSDK {
     });
   }
 
-  public async getTraderHistory(account: string): Promise<{ trades: Trade[]; orders: Trade[] }> {
+  public async getTraderHistory(account: string): Promise<{ trades: TradeWithHistory[]; orders: TradeWithHistory[] }> {
     const addHistoryEntries = (trade: Trade, traderBackendData: TradeHistoryRecord[]): TradeWithHistory => {
       return {
         ...trade,
@@ -362,6 +362,7 @@ export class TradingSDK {
           .map((t) => {
             return {
               action: t.action as TradeAction,
+              date: t.date,
               block: t.block,
               leverage: t.leverage,
               collateralAmount: t.size,

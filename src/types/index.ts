@@ -30,6 +30,7 @@ export type TradeAction =
 
 export type TradeHistoryEntry = {
   action: TradeAction;
+  date: string;
   block: number;
   leverage: number;
   collateralAmount: number;
