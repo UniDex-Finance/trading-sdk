@@ -27,6 +27,8 @@ export interface Position {
 
 export interface Market {
   marketName: string;
+  from: string;
+  to: string;
   category: number;
   marketKey: number;
   pairBorrowingFees: any;
@@ -50,7 +52,9 @@ export const getMarket = (state: State, pair: Pair, pairIndex: number) => {
   const minLeverage = groups[pair.groupIndex].minLeverage;
 
   return {
-    marketName: `${pair.from}${pair.to}`,
+    marketName: `${pair.from}/${pair.to}`,
+    from: pair.from,
+    to: pair.to,
     category: pair.groupIndex,
     marketKey: pairIndex,
     pairBorrowingFees: collaterals.map(({ collateral }, collateralIndex) => {
