@@ -1,6 +1,6 @@
 export enum SupportedChainId {
   Arbitrum = 42161,
-  ArbitrumSepolia = 421611,
+  ArbitrumSepolia = 421614,
   Polygon = 137,
   Base = 8453,
 }
