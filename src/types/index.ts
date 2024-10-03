@@ -1,4 +1,12 @@
+import { ethers } from "ethers";
 import { BorrowingFee, CollateralConfig, Fee, FeeTiers, Pair, Trade, TradingGroup } from "@gainsnetwork/sdk";
+import { SupportedChainId } from "../config";
+
+export type TradingSdkOptions = {
+  chainId: SupportedChainId;
+  signer?: ethers.Signer;
+  rpcProviderUrl?: string;
+};
 
 export type State = {
   collaterals: CollateralConfig[];

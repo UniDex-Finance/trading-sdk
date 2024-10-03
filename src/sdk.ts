@@ -1,4 +1,4 @@
-import { getDefaultProvider } from "./utils/defaultProvider";
+import { getProvider } from "./utils/getProvider";
 import { GNS_DIAMOND_ADDRESSES, MULTICALL3_ADDRESS, SupportedChainId } from "./config/constants";
 import { multiCall } from "./utils/multicallHelper";
 import {
@@ -12,7 +12,7 @@ import {
 } from "@gainsnetwork/sdk";
 import { GNSDiamond, GNSDiamond__factory, Multicall3__factory } from "./types/contracts";
 import { BigNumberish, Contract, ethers } from "ethers";
-import { State, TradeAction, TradeWithHistory } from "./types";
+import { State, TradeAction, TradeWithHistory, TradingSdkOptions } from "./types";
 import ERC20_ABI from "./abi/ERC20.json";
 import { ModifyPositionTxType, ModifyPositionTxArgs, OpenTradeTxArgs, CloseTradeMarketTxArgs } from "./types/tx";
 import {
@@ -53,10 +53,10 @@ export class TradingSDK {
   public lastRefreshedTs: number = Date.now();
   public initialized: boolean = false;
 
-  constructor(chainId: SupportedChainId, signer?: ethers.Signer, rpcProvider?: ethers.JsonRpcProvider) {
+  constructor({ chainId, signer, rpcProviderUrl }: TradingSdkOptions) {
     this.chainId = chainId;
     this.signer = signer;
-    this.runner = this.signer ?? rpcProvider ?? getDefaultProvider(chainId);
+    this.runner = this.signer ?? getProvider(chainId, rpcProviderUrl);
 
     this.gnsDiamond = GNSDiamond__factory.connect(GNS_DIAMOND_ADDRESSES[chainId], this.runner);
     this.multicall3 = new ethers.Contract(MULTICALL3_ADDRESS, Multicall3__factory.abi, this.runner);
