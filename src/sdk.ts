@@ -12,7 +12,7 @@ import {
 } from "@gainsnetwork/sdk";
 import { GNSDiamond, GNSDiamond__factory, Multicall3__factory } from "./types/contracts";
 import { BigNumberish, Contract, ethers } from "ethers";
-import { State, TradeAction, TradeWithHistory } from "./types";
+import { State, TradeAction, TradeWithHistory, TradingSdkOptions } from "./types";
 import ERC20_ABI from "./abi/ERC20.json";
 import { ModifyPositionTxType, ModifyPositionTxArgs, OpenTradeTxArgs, CloseTradeMarketTxArgs } from "./types/tx";
 import {
@@ -53,7 +53,7 @@ export class TradingSDK {
   public lastRefreshedTs: number = Date.now();
   public initialized: boolean = false;
 
-  constructor(chainId: SupportedChainId, signer?: ethers.Signer, rpcProviderUrl?: string) {
+  constructor({ chainId, signer, rpcProviderUrl }: TradingSdkOptions) {
     this.chainId = chainId;
     this.signer = signer;
     this.runner = this.signer ?? getProvider(chainId, rpcProviderUrl);
