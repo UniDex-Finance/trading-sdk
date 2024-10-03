@@ -1,6 +1,6 @@
 {
   "name": "@gainsnetwork/trading-sdk",
-  "version": "0.0.1-rc6",
+  "version": "0.0.2-rc1",
   "description": "Gains Network Trading SDK",
   "main": "./lib/index.js",
   "files": [
@@ -25,7 +25,7 @@
     "typescript": "^5.6.2"
   },
   "dependencies": {
-    "@gainsnetwork/sdk": "^0.2.25-rc1",
+    "@gainsnetwork/sdk": "^0.2.31-rc2",
     "ethers": "^6.13.2"
   }
 }

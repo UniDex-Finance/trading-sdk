@@ -1,10 +1,18 @@
-import { getDefaultProvider } from "./utils/defaultProvider";
+import { getProvider } from "./utils/getProvider";
 import { GNS_DIAMOND_ADDRESSES, MULTICALL3_ADDRESS, SupportedChainId } from "./config/constants";
 import { multiCall } from "./utils/multicallHelper";
-import { getCurrentDay, pairs as pairsSdk, TradeContainer, TraderFeeTiers } from "@gainsnetwork/sdk";
+import {
+  getCurrentDay,
+  pairs as pairsSdk,
+  Trade,
+  TradeContainer,
+  TradeHistoryRecord,
+  TraderFeeTiers,
+  TradeType,
+} from "@gainsnetwork/sdk";
 import { GNSDiamond, GNSDiamond__factory, Multicall3__factory } from "./types/contracts";
 import { BigNumberish, Contract, ethers } from "ethers";
-import { State } from "./types";
+import { State, TradeAction, TradeWithHistory, TradingSdkOptions } from "./types";
 import ERC20_ABI from "./abi/ERC20.json";
 import { ModifyPositionTxType, ModifyPositionTxArgs, OpenTradeTxArgs, CloseTradeMarketTxArgs } from "./types/tx";
 import {
@@ -25,12 +33,13 @@ import {
   convertFeeTiers,
   convertGroupBorrowingFee,
   convertPairBorrowingFee,
+  convertTrade,
   convertTradeContainer,
   convertTraderFeeTiers,
   convertTradingGroups,
   convertTradingPairs,
 } from "./utils/dataConverter";
-import { IBorrowingFees, IFeeTiers, IPairsStorage } from "./types/contracts/GNSDiamond";
+import { IBorrowingFees, IFeeTiers, IPairsStorage, ITradingStorage } from "./types/contracts/GNSDiamond";
 import { Backend } from "./services/backend";
 
 export class TradingSDK {
@@ -44,10 +53,10 @@ export class TradingSDK {
   public lastRefreshedTs: number = Date.now();
   public initialized: boolean = false;
 
-  constructor(chainId: SupportedChainId, signer?: ethers.Signer, rpcProvider?: ethers.JsonRpcProvider) {
+  constructor({ chainId, signer, rpcProviderUrl }: TradingSdkOptions) {
     this.chainId = chainId;
     this.signer = signer;
-    this.runner = this.signer ?? rpcProvider ?? getDefaultProvider(chainId);
+    this.runner = this.signer ?? getProvider(chainId, rpcProviderUrl);
 
     this.gnsDiamond = GNSDiamond__factory.connect(GNS_DIAMOND_ADDRESSES[chainId], this.runner);
     this.multicall3 = new ethers.Contract(MULTICALL3_ADDRESS, Multicall3__factory.abi, this.runner);
@@ -344,8 +353,56 @@ export class TradingSDK {
     });
   }
 
-  public async getTraderHistory(account: string) {
-    return this.backend.getTraderHistory(account);
+  public async getTraderHistory(account: string): Promise<{ trades: TradeWithHistory[]; orders: TradeWithHistory[] }> {
+    const addHistoryEntries = (trade: Trade, traderBackendData: TradeHistoryRecord[]): TradeWithHistory => {
+      return {
+        ...trade,
+        history: traderBackendData
+          .filter((it) => it.tradeIndex === trade.index)
+          .map((t) => {
+            return {
+              action: t.action as TradeAction,
+              date: t.date,
+              block: t.block,
+              leverage: t.leverage,
+              collateralAmount: t.size,
+              collateralPriceUsd: t.collateralPriceUsd,
+              tx: t.tx,
+              marketPrice: t.marketPrice,
+              pnl: t.pnl_net,
+              openPrice: t.price,
+              leverageDelta: t.leverageDelta,
+              collateralDelta: t.collateralDelta,
+            };
+          })
+          .reverse(),
+      };
+    };
+    const { collaterals } = this.state;
+    const accountCounters = await this.gnsDiamond.getCounters(account, 0);
+    const userTradesBackend = await this.backend.getTraderHistory(account);
+
+    const userTradesAndOrdersCalls = Array.from({ length: Number(accountCounters.currentIndex) }, (_, index) => ({
+      functionName: "getTrade",
+      args: [account, index],
+    }));
+    const userTradesAndOrdersResults: [ITradingStorage.TradeStructOutput][] = await multiCall(
+      this.multicall3,
+      this.gnsDiamond,
+      userTradesAndOrdersCalls
+    );
+    const userTradesAndOrders = userTradesAndOrdersResults
+      .map((trade) => convertTrade(trade[0], collaterals))
+      .map((trade) => addHistoryEntries(trade, userTradesBackend));
+    const userTrades = userTradesAndOrders.filter((trade) => trade.tradeType === TradeType.TRADE);
+    const userOrders = userTradesAndOrders.filter(
+      (trade) => trade.tradeType === TradeType.LIMIT || trade.tradeType === TradeType.STOP
+    );
+
+    return {
+      trades: userTrades,
+      orders: userOrders,
+    };
   }
 
   get build() {

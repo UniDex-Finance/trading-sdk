@@ -4,7 +4,7 @@ import { TradingSDK } from "../src/sdk";
 import { ModifyPositionTxType, UpdatePositionSizeTxType } from "../src/types/tx";
 
 async function runTest() {
-  const tradingSdk = new TradingSDK(SupportedChainId.ArbitrumSepolia);
+  const tradingSdk = new TradingSDK({ chainId: SupportedChainId.ArbitrumSepolia });
 
   try {
     {
