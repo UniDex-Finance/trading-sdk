@@ -7,7 +7,7 @@ export const getProvider = (chainId: SupportedChainId, providerUrl?: string) => 
   }
   // default providers
   if (chainId === SupportedChainId.Arbitrum) {
-    return new ethers.JsonRpcProvider("https://arbitrum.llamarpc.com");
+    return new ethers.JsonRpcProvider("https://arbitrum-one.public.blastapi.io");
   }
   if (chainId === SupportedChainId.ArbitrumSepolia) {
     return new ethers.JsonRpcProvider("https://sepolia-rollup.arbitrum.io/rpc");
