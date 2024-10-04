@@ -1,6 +1,6 @@
 {
   "name": "@gainsnetwork/trading-sdk",
-  "version": "0.0.2-rc4",
+  "version": "0.0.2-rc5",
   "description": "Gains Network Trading SDK",
   "main": "./lib/index.js",
   "files": [
@@ -13,6 +13,8 @@
     "sdkTest": "ts-node tests/sdkTest.ts",
     "sdkTest:build": "ts-node tests/buildTx.ts",
     "dev": "nodemon --watch 'src/**' --watch 'tests/**' --ext 'ts,json' --exec 'ts-node tests/sdkTest.ts'",
+    "prepublishOnly": "npm run build",
+    "postinstall": "npm run generate-types",
     "typecheck": "npm run generate-types && tsc --noEmit"
   },
   "author": "",
