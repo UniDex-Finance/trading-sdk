@@ -122,7 +122,7 @@ export class TradingSDK {
       ])) as [
         [IPairsStorage.PairStruct][],
         [IPairsStorage.GroupStruct][],
-        [IPairsStorage.FeeStruct][],
+        [IPairsStorage.FeeGroupStruct][],
         [IFeeTiers.FeeTierStruct][],
         BigNumberish[],
         [
@@ -213,7 +213,7 @@ export class TradingSDK {
       groups,
       pairs,
       fees,
-      maxPairLeverages: maxPairLeverages.map((maxLev) => Number(maxLev)),
+      maxPairLeverages: maxPairLeverages.map((maxLev) => Number(maxLev) / 1e3),
       groupBorrowingFees,
       pairBorrowingFees,
       maxGainP: 900,
