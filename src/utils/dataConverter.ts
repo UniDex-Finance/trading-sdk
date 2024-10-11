@@ -84,6 +84,8 @@ export const convertPairFactor = (pairFactor: IPriceImpact.PairFactorsStruct): P
   cumulativeFactor: Number(pairFactor.cumulativeFactor) / 1e10,
   protectionCloseFactor: Number(pairFactor.protectionCloseFactor) / 1e10,
   protectionCloseFactorBlocks: Number(pairFactor.protectionCloseFactorBlocks),
+  exemptOnOpen: pairFactor.exemptOnOpen,
+  exemptAfterProtectionCloseFactor: pairFactor.exemptAfterProtectionCloseFactor,
 });
 
 export const convertTrade = (
@@ -134,8 +136,8 @@ export const convertTradingGroups = (groups: IPairsStorage.GroupStruct[]): Tradi
   groups?.map((group) => convertTradingGroup(group));
 
 export const convertTradingGroup = (group: IPairsStorage.GroupStruct): TradingGroup => ({
-  maxLeverage: Number(group.maxLeverage),
-  minLeverage: Number(group.minLeverage),
+  maxLeverage: Number(group.maxLeverage) / 1e3,
+  minLeverage: Number(group.minLeverage) / 1e3,
   name: group.name,
 });
 
@@ -150,16 +152,16 @@ export const convertTradingPair = (pair: IPairsStorage.PairStruct, index: number
   pairIndex: index,
   feeIndex: Number(pair.feeIndex),
   groupIndex: Number(pair.groupIndex),
-  spreadP: Number(pair.spreadP) / 1e10 / 100,
+  spreadP: Number(pair.spreadP) / 1e12,
 });
 
-export const convertFees = (fees: IPairsStorage.FeeStruct[]): Fee[] => fees?.map((fee) => convertFee(fee));
+export const convertFees = (fees: IPairsStorage.FeeGroupStruct[]): Fee[] => fees?.map((fee) => convertFee(fee));
 
-export const convertFee = (fee: IPairsStorage.FeeStruct): Fee => ({
-  openFeeP: Number(fee.openFeeP) / 1e12,
-  closeFeeP: Number(fee.closeFeeP) / 1e12,
-  minPositionSizeUsd: Number(fee.minPositionSizeUsd) / 1e18,
-  triggerOrderFeeP: Number(fee.triggerOrderFeeP) / 1e12,
+export const convertFee = (fee: IPairsStorage.FeeGroupStruct): Fee => ({
+  totalPositionSizeFeeP: Number(fee.totalPositionSizeFeeP) / 1e12,
+  totalLiqCollateralFeeP: Number(fee.totalLiqCollateralFeeP) / 1e12,
+  oraclePositionSizeFeeP: Number(fee.oraclePositionSizeFeeP) / 1e12,
+  minPositionSizeUsd: Number(fee.minPositionSizeUsd) / 1e3,
 });
 
 export const convertOpenInterests = (interests: IBorrowingFees.OpenInterestStruct[]): OpenInterest[] =>
@@ -296,4 +298,5 @@ export const convertTraderFeeTiers = (traderFeeTiers: {
   outboundPoints: Number(traderFeeTiers.outboundPoints) / 1e18,
   lastDayUpdatedPoints: Number(traderFeeTiers.lastDayUpdatedPoints) / 1e18,
   expiredPoints: traderFeeTiers.expiredPoints.map((point) => Number(point) / 1e18),
+  unclaimedPoints: Number(traderFeeTiers.inboundPoints) / 1e18
 });
