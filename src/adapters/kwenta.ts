@@ -80,6 +80,7 @@ export const getMarket = (state: State, pair: Pair, pairIndex: number): Market =
     category: pair.groupIndex,
     marketKey: pairIndex,
     pairBorrowingFees: collaterals.map(({ collateral }, collateralIndex) => {
+      const { groups } = pairBorrowingFees[collateralIndex][pairIndex];
       const { feePerBlock, accFeeLong, accFeeShort, accLastUpdatedBlock, feeExponent } =
         pairBorrowingFees[collateralIndex][pairIndex];
       return {
@@ -88,11 +89,12 @@ export const getMarket = (state: State, pair: Pair, pairIndex: number): Market =
         accFeeShort,
         accLastUpdatedBlock,
         feeExponent,
-        group: pairBorrowingFees[collateralIndex][pairIndex].groups[0],
+        group: groups[groups.length - 1],
       };
     }),
     groupBorrowingFees: collaterals.map(({ collateral }, collateralIndex) => {
-      const groupIndex = pairBorrowingFees[collateralIndex][pairIndex].groups[0]?.groupIndex;
+      const { groups } = pairBorrowingFees[collateralIndex][pairIndex];
+      const groupIndex = groups[groups.length - 1]?.groupIndex;
       if (!groupIndex) return undefined;
       const groupBorrowingFee = groupBorrowingFees[collateralIndex][groupIndex];
       const { accFeeLong, accFeeShort, accLastUpdatedBlock, feeExponent, feePerBlock } = groupBorrowingFee;
@@ -106,7 +108,8 @@ export const getMarket = (state: State, pair: Pair, pairIndex: number): Market =
     }),
     openInterests: collaterals.map(({ collateral }, collateralIndex) => {
       const { long, short, max } = pairBorrowingFees[collateralIndex][pairIndex].oi;
-      const groupIndex = pairBorrowingFees[collateralIndex][pairIndex].groups[0]?.groupIndex;
+      const { groups } = pairBorrowingFees[collateralIndex][pairIndex];
+      const groupIndex = groups[groups.length - 1]?.groupIndex;
       return {
         pair: {
           long,
