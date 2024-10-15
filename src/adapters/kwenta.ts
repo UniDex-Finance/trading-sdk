@@ -1,5 +1,6 @@
 import { Fee, OpenInterest, Pair, TradeContainer, TradingGroup } from "@gainsnetwork/sdk";
 import { State, TradeWithHistory } from "../types";
+import { BorrowingData } from "@gainsnetwork/sdk/lib/trade/fees/borrowing/types";
 
 export enum PositionSide {
   LONG,
@@ -36,8 +37,8 @@ export interface Market {
   to: string;
   category: number;
   marketKey: number;
-  pairBorrowingFees: any;
-  groupBorrowingFees: any;
+  pairBorrowingFees: BorrowingData[];
+  groupBorrowingFees: (BorrowingData | undefined)[];
   openInterests: { pair: OpenInterest; group: OpenInterest }[];
   spreadP: number;
   feeRates: Fee;
@@ -66,7 +67,7 @@ export const getMarkets = (state: State): Market[] => {
   return state.pairs.map((pair, pairIndex) => getMarket(state, pair, pairIndex));
 };
 
-export const getMarket = (state: State, pair: Pair, pairIndex: number) => {
+export const getMarket = (state: State, pair: Pair, pairIndex: number): Market => {
   const { collaterals, groups, maxPairLeverages, pairBorrowingFees, groupBorrowingFees, fees } = state;
   const maxLeverage =
     maxPairLeverages[pairIndex] === 0 ? groups[pair.groupIndex].maxLeverage : maxPairLeverages[pairIndex];
@@ -79,6 +80,7 @@ export const getMarket = (state: State, pair: Pair, pairIndex: number) => {
     category: pair.groupIndex,
     marketKey: pairIndex,
     pairBorrowingFees: collaterals.map(({ collateral }, collateralIndex) => {
+      const { groups } = pairBorrowingFees[collateralIndex][pairIndex];
       const { feePerBlock, accFeeLong, accFeeShort, accLastUpdatedBlock, feeExponent } =
         pairBorrowingFees[collateralIndex][pairIndex];
       return {
@@ -87,31 +89,34 @@ export const getMarket = (state: State, pair: Pair, pairIndex: number) => {
         accFeeShort,
         accLastUpdatedBlock,
         feeExponent,
-        group: pairBorrowingFees[collateralIndex][pairIndex].groups[0],
+        group: groups[groups.length - 1],
       };
     }),
     groupBorrowingFees: collaterals.map(({ collateral }, collateralIndex) => {
-      return groupBorrowingFees[collateralIndex].map((groupBorrowingFees) => {
-        const { accFeeLong, accFeeShort, accLastUpdatedBlock, feeExponent, feePerBlock } = groupBorrowingFees;
-        return {
-          accFeeLong,
-          accFeeShort,
-          accLastUpdatedBlock,
-          feeExponent,
-          feePerBlock,
-        };
-      });
+      const { groups } = pairBorrowingFees[collateralIndex][pairIndex];
+      const groupIndex = groups[groups.length - 1]?.groupIndex;
+      if (!groupIndex) return undefined;
+      const groupBorrowingFee = groupBorrowingFees[collateralIndex][groupIndex];
+      const { accFeeLong, accFeeShort, accLastUpdatedBlock, feeExponent, feePerBlock } = groupBorrowingFee;
+      return {
+        accFeeLong,
+        accFeeShort,
+        accLastUpdatedBlock,
+        feeExponent,
+        feePerBlock,
+      };
     }),
     openInterests: collaterals.map(({ collateral }, collateralIndex) => {
       const { long, short, max } = pairBorrowingFees[collateralIndex][pairIndex].oi;
-      const groupIndex = pairBorrowingFees[collateralIndex][pairIndex].groups[0]?.groupIndex || 0;
+      const { groups } = pairBorrowingFees[collateralIndex][pairIndex];
+      const groupIndex = groups[groups.length - 1]?.groupIndex;
       return {
         pair: {
           long,
           short,
           max,
         },
-        group: groupBorrowingFees[collateralIndex][groupIndex].oi,
+        group: groupBorrowingFees[collateralIndex][groupIndex]?.oi || undefined,
       };
     }),
     spreadP: pair.spreadP,
