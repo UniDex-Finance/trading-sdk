@@ -79,6 +79,27 @@ async function runTest() {
       const tx = await tradingSdk.build.cancelOrderAfterTimeout(index);
       console.log(tx);
     }
+
+    {
+      const args = {
+        user: "0x73b3A111C5BCCf9086c97B96e0AbAad69Dc4f523",
+        pairIndex: 0, // BTC/USD
+        collateralAmount: parseUnits("100", 6), // 100 USDC
+        openPrice: 66108.8,
+        long: true, // Long
+        leverage: 2, // 2x
+        tp: 363598.4,
+        sl: 0,
+        collateralIndex: 3, // USDC
+        tradeType: 0, // Market
+        maxSlippage: 1.02,
+      };
+      console.log(`\nmulticall`);
+      const tx1 = await tradingSdk.build.openTrade(args);
+      const tx2 = await tradingSdk.build.openTrade(args);
+      const multicallTx = await tradingSdk.build.multicall([tx1, tx2]);
+      console.log(multicallTx);
+    }
   } catch (error) {
     console.error("Error:", error);
   }

@@ -12,13 +12,22 @@ import {
 } from "@gainsnetwork/sdk";
 import { GNSDiamond, GNSDiamond__factory, Multicall3__factory } from "./types/contracts";
 import { BigNumberish, Contract, ethers } from "ethers";
-import { State, TradeAction, TradeWithHistory, TradingSdkOptions } from "./types";
+import {
+  DelegatedTradingActionTxArgs,
+  MulticallTxArgs,
+  State,
+  TradeAction,
+  TradeWithHistory,
+  TradingSdkOptions,
+} from "./types";
 import ERC20_ABI from "./abi/ERC20.json";
 import { ModifyPositionTxType, ModifyPositionTxArgs, OpenTradeTxArgs, CloseTradeMarketTxArgs } from "./types/tx";
 import {
   buildCancelOpenOrderTx,
   buildCancelOrderAfterTimeoutTx,
   buildCloseTradeMarketTx,
+  buildDelegatedTradingAction,
+  buildMulticallTx,
   buildOpenTradeTx,
   buildUpdateLeverageTx,
   buildUpdateMaxClosingSlippagePTx,
@@ -452,6 +461,12 @@ export class TradingSDK {
       cancelOrderAfterTimeout: async (index: number) => {
         return buildCancelOrderAfterTimeoutTx(this.gnsDiamond, index);
       },
+      delegatedTradingAction: async (args: DelegatedTradingActionTxArgs) => {
+        return buildDelegatedTradingAction(this.gnsDiamond, args);
+      },
+      multicall: async (calls: MulticallTxArgs) => {
+        return buildMulticallTx(this.gnsDiamond, calls);
+      },
     };
   }
 
@@ -491,13 +506,15 @@ export class TradingSDK {
 
         return hash;
       },
-      multicall: async (args: string[]) => {
-        const { hash } = await this.gnsDiamond.multicall(args);
+      multicall: async (calls: MulticallTxArgs) => {
+        const tx = await this.build.multicall(calls);
+        const hash = await this.signer?.sendTransaction({ ...tx, chainId: this.chainId });
 
         return hash;
       },
-      delegatedTradingAction: async (trader: string, calldata: string) => {
-        const { hash } = await this.gnsDiamond.delegatedTradingAction(trader, calldata);
+      delegatedTradingAction: async (args: DelegatedTradingActionTxArgs) => {
+        const tx = await this.build.delegatedTradingAction(args);
+        const hash = await this.signer?.sendTransaction({ ...tx, chainId: this.chainId });
 
         return hash;
       },

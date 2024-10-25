@@ -1,3 +1,8 @@
+export type BuildTransactionOutput = {
+  data: string;
+  to: string;
+};
+
 export enum ModifyPositionTxType {
   INCREASE_POSITION_SIZE,
   DECREASE_POSITION_SIZE,
@@ -85,3 +90,10 @@ export type CloseTradeMarketTxArgs = {
   expectedPrice: number;
   maxSlippageP?: number;
 };
+
+export type DelegatedTradingActionTxArgs = {
+  trader: string;
+  data: string;
+};
+
+export type MulticallTxArgs = BuildTransactionOutput[] | string[];
