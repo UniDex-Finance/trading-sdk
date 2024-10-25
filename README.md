@@ -46,6 +46,9 @@ const args = {
 
 // build openTrade transaction data
 const tx = await tradingSdk.build.openTrade(args);
+
+// (optional) use multicall to batch multiple requests in a single transaction
+const multicallTx = await tradingSdk.build.multicall([tx /*, tx2, tx3, ...*/])
 ```
 
 ### Write methods
