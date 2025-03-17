@@ -23,6 +23,7 @@ import {
 } from "@gainsnetwork/sdk";
 
 import { ITradingStorage, IBorrowingFees, IPriceImpact, IFeeTiers, IPairsStorage } from "../types/contracts/GNSDiamond";
+import { ExtendedCollateralConfig } from "../types";
 
 export const convertTradesAndLimitOrders = (
   allItems: {
@@ -255,7 +256,7 @@ export const convertOiWindowsSettings = (
 
 export const convertCollateralConfig = (
   collateral: Omit<ITradingStorage.CollateralStruct, "__placeholder"> & { decimals: BigNumberish; symbol: string }
-): CollateralConfig => ({
+): ExtendedCollateralConfig => ({
   collateral: collateral.collateral as string,
   isActive: collateral.isActive,
   precision: Number(collateral.precision),

@@ -14,6 +14,7 @@ import { GNSDiamond, GNSDiamond__factory, Multicall3__factory } from "./types/co
 import { BigNumberish, Contract, ethers } from "ethers";
 import {
   DelegatedTradingActionTxArgs,
+  ExtendedCollateralConfig,
   MulticallTxArgs,
   State,
   TradeAction,
@@ -41,6 +42,7 @@ import {
   convertFees,
   convertFeeTiers,
   convertGroupBorrowingFee,
+  convertLiquidationParams,
   convertPairBorrowingFee,
   convertTrade,
   convertTradeContainer,
@@ -50,6 +52,7 @@ import {
 } from "./utils/dataConverter";
 import { IBorrowingFees, IFeeTiers, IPairsStorage, ITradingStorage } from "./types/contracts/GNSDiamond";
 import { Backend } from "./services/backend";
+import { LiquidationParams } from "@gainsnetwork/sdk/lib/trade/types";
 
 export class TradingSDK {
   private chainId: SupportedChainId;
@@ -120,26 +123,48 @@ export class TradingSDK {
       };
     });
 
-    const [pairResults, groupsResults, feesResults, feeTiersResults, feeMultipliersResults, pairBorrowingFeesResults] =
-      (await Promise.all([
-        multiCall(this.multicall3, this.gnsDiamond, pairCalls),
-        multiCall(this.multicall3, this.gnsDiamond, groupCalls),
-        multiCall(this.multicall3, this.gnsDiamond, feesCalls),
-        multiCall(this.multicall3, this.gnsDiamond, feeTiersCalls),
-        multiCall(this.multicall3, this.gnsDiamond, feeMultipliersCalls),
-        multiCall(this.multicall3, this.gnsDiamond, pairBorrowingFeesCalls),
-      ])) as [
-        [IPairsStorage.PairStruct][],
-        [IPairsStorage.GroupStruct][],
-        [IPairsStorage.FeeGroupStruct][],
-        [IFeeTiers.FeeTierStruct][],
-        BigNumberish[],
-        [
-          IBorrowingFees.BorrowingDataStruct[],
-          IBorrowingFees.OpenInterestStruct[],
-          [IBorrowingFees.BorrowingPairGroupStruct[]]
-        ][]
-      ];
+    const pairLiquidationParamsCalls = Array.from({ length: pairCount }, (_, index) => ({
+      functionName: "getPairLiquidationParams",
+      args: [index],
+    }));
+
+    const groupLiquidationParamsCalls = Array.from({ length: Number(groupsCount) }, (_, index) => ({
+      functionName: "getGroupLiquidationParams",
+      args: [index],
+    }));
+
+    const [
+      pairResults,
+      groupsResults,
+      feesResults,
+      feeTiersResults,
+      feeMultipliersResults,
+      pairBorrowingFeesResults,
+      pairLiquidationParamsResults,
+      groupLiquidationParamsResults,
+    ] = (await Promise.all([
+      multiCall(this.multicall3, this.gnsDiamond, pairCalls),
+      multiCall(this.multicall3, this.gnsDiamond, groupCalls),
+      multiCall(this.multicall3, this.gnsDiamond, feesCalls),
+      multiCall(this.multicall3, this.gnsDiamond, feeTiersCalls),
+      multiCall(this.multicall3, this.gnsDiamond, feeMultipliersCalls),
+      multiCall(this.multicall3, this.gnsDiamond, pairBorrowingFeesCalls),
+      multiCall(this.multicall3, this.gnsDiamond, pairLiquidationParamsCalls),
+      multiCall(this.multicall3, this.gnsDiamond, groupLiquidationParamsCalls),
+    ])) as [
+      [IPairsStorage.PairStruct][],
+      [IPairsStorage.GroupStruct][],
+      [IPairsStorage.FeeGroupStruct][],
+      [IFeeTiers.FeeTierStruct][],
+      BigNumberish[],
+      [
+        IBorrowingFees.BorrowingDataStruct[],
+        IBorrowingFees.OpenInterestStruct[],
+        [IBorrowingFees.BorrowingPairGroupStruct[]]
+      ][],
+      [IPairsStorage.GroupLiquidationParamsStruct][],
+      [IPairsStorage.GroupLiquidationParamsStruct][]
+    ];
 
     const pairs = convertTradingPairs(pairResults.map((pair) => pair[0]));
     const groups = convertTradingGroups(groupsResults.map((group) => group[0]));
@@ -219,7 +244,15 @@ export class TradingSDK {
         };
       }
     );
-    const collateralConfigs = collateralsWithDecimalsAndSymbols.map(convertCollateralConfig);
+    const collateralConfigs: ExtendedCollateralConfig[] =
+      collateralsWithDecimalsAndSymbols.map(convertCollateralConfig);
+
+    const pairLiquidationParams: LiquidationParams[] = pairLiquidationParamsResults.map(([liqParams]) =>
+      convertLiquidationParams(liqParams)
+    );
+    const groupLiquidationParams: LiquidationParams[] = groupLiquidationParamsResults.map(([liqParams]) =>
+      convertLiquidationParams(liqParams)
+    );
 
     this.lastRefreshedTs = Date.now();
     this.state = {
@@ -230,8 +263,8 @@ export class TradingSDK {
       maxPairLeverages: maxPairLeverages.map((maxLev) => Number(maxLev) / 1e3),
       groupBorrowingFees,
       pairBorrowingFees,
-      maxGainP: 900,
       feeTiers,
+      liquidationParams: { pairs: pairLiquidationParams, groups: groupLiquidationParams },
     };
   }
 
