@@ -1,22 +1,24 @@
 import { ethers } from "ethers";
 import { BorrowingFee, CollateralConfig, Fee, FeeTiers, Pair, Trade, TradingGroup } from "@gainsnetwork/sdk";
 import { SupportedChainId } from "../config";
+import { LiquidationParams } from "@gainsnetwork/sdk/lib/trade/types";
 
 export type TradingSdkOptions = {
   chainId: SupportedChainId;
   signer?: ethers.Signer;
   rpcProviderUrl?: string;
 };
+export type ExtendedCollateralConfig = CollateralConfig & { symbol?: string };
 
 export type State = {
-  collaterals: CollateralConfig[];
+  collaterals: ExtendedCollateralConfig[];
   groups: TradingGroup[];
   pairs: Pair[];
   fees: Fee[];
+  liquidationParams: { pairs: LiquidationParams[]; groups: LiquidationParams[] };
   maxPairLeverages: number[];
   groupBorrowingFees: BorrowingFee.Group[][];
   pairBorrowingFees: BorrowingFee.Pair[][];
-  maxGainP: number;
   feeTiers: FeeTiers;
 };
 
