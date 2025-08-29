@@ -1,0 +1,14 @@
+import { OpenTradeTxArgs, UpdateLeverageTxArgs, UpdatePositionSizeTxArgs, UpdateSlTxArgs, UpdateTpTxArgs, CloseTradeMarketTxArgs, UpdateOpenOrderTxArgs, updateMaxClosingSlippagePTxArgs, BuildTransactionOutput, MulticallTxArgs, DelegatedTradingActionTxArgs } from "../types/tx";
+import { GNSDiamond } from "../types/contracts";
+export declare function buildUpdatePositionSizeTx(gnsDiamond: GNSDiamond, args: UpdatePositionSizeTxArgs): Promise<BuildTransactionOutput>;
+export declare function buildUpdateSlTx(gnsDiamond: GNSDiamond, args: UpdateSlTxArgs): Promise<BuildTransactionOutput>;
+export declare function buildUpdateTpTx(gnsDiamond: GNSDiamond, args: UpdateTpTxArgs): Promise<BuildTransactionOutput>;
+export declare function buildUpdateLeverageTx(gnsDiamond: GNSDiamond, args: UpdateLeverageTxArgs): Promise<BuildTransactionOutput>;
+export declare function buildUpdateOpenOrderTx(gnsDiamond: GNSDiamond, args: UpdateOpenOrderTxArgs): Promise<BuildTransactionOutput>;
+export declare function buildUpdateMaxClosingSlippagePTx(gnsDiamond: GNSDiamond, args: updateMaxClosingSlippagePTxArgs): Promise<BuildTransactionOutput>;
+export declare function buildOpenTradeTx(gnsDiamond: GNSDiamond, args: OpenTradeTxArgs): Promise<BuildTransactionOutput>;
+export declare function buildCloseTradeMarketTx(gnsDiamond: GNSDiamond, args: CloseTradeMarketTxArgs): Promise<BuildTransactionOutput>;
+export declare function buildCancelOpenOrderTx(gnsDiamond: GNSDiamond, index: number): Promise<BuildTransactionOutput>;
+export declare function buildCancelOrderAfterTimeoutTx(gnsDiamond: GNSDiamond, index: number): Promise<BuildTransactionOutput>;
+export declare function buildDelegatedTradingAction(gnsDiamond: GNSDiamond, args: DelegatedTradingActionTxArgs): Promise<BuildTransactionOutput>;
+export declare function buildMulticallTx(gnsDiamond: GNSDiamond, calls: MulticallTxArgs): Promise<BuildTransactionOutput>;
